@@ -129,8 +129,11 @@ export default function SSTDashboard() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-[#DCDCDC] bg-[#FFC107] p-3 text-center text-lg font-black uppercase tracking-wide text-[#134686]">
-        ARGOS SST - Modulos Implementados
+      <div className="flex items-center justify-center gap-3 rounded-lg border border-[#FF7F11] bg-[#FF7F11] p-3 text-center text-lg font-black uppercase tracking-wide text-white shadow-sm">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-white p-1 shadow-sm">
+          <img src="/logo.jpg" alt="Logo Argos" className="h-full w-full object-contain" />
+        </div>
+        <span>ARGOS SST - Módulos Implementados</span>
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">

@@ -19,15 +19,23 @@ async function verifyAdminAccess(): Promise<boolean> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return false;
 
-    const { data: profile } = await supabase
+    // Usamos el admin client para leer el rol y esquivar posibles bloqueos de RLS
+    const admin = getAdminClient();
+    const { data: profile, error } = await admin
       .from('profiles')
       .select('roles(name)')
       .eq('id', user.id)
       .single();
 
+    if (error) {
+      console.error('Error fetching profile role:', error);
+      return false;
+    }
+
     const roleName = (profile?.roles as any)?.name;
     return ['SUPERADMIN', 'ADMIN_SST'].includes(roleName);
-  } catch {
+  } catch (err) {
+    console.error('Exception in verifyAdminAccess:', err);
     return false;
   }
 }
