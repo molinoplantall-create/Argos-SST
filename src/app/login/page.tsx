@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useFeedback } from '@/components/common/FeedbackUI';
 import { Lock, Mail, Loader2, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import Image from 'next/image';
 
 const REMEMBER_KEY = 'argos_remember_email';
 
@@ -65,40 +66,35 @@ function LoginForm() {
 
   return (
     <div className="w-full max-w-sm z-10">
-      <div className="bg-[#162230] border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
+      <div className="bg-white border border-gray-200 rounded-2xl shadow-xl overflow-hidden">
 
         {/* Header con logo */}
-        <div className="px-8 pt-10 pb-6 text-center border-b border-white/10">
+        <div className="px-8 pt-10 pb-6 text-center border-b border-gray-100">
           <div className="flex justify-center mb-5">
-            <div className="relative flex items-center gap-3">
-              <div className="relative">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#1E93AB] to-[#134686] flex items-center justify-center shadow-lg shadow-[#1E93AB]/30">
-                  <ShieldCheck className="w-7 h-7 text-white" />
-                </div>
-                <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-[#FF7F11] rounded-full flex items-center justify-center shadow-md">
-                  <div className="w-2 h-2 bg-white rounded-full" />
-                </div>
-              </div>
-              <div className="text-left">
-                <div className="text-3xl font-black text-white leading-none tracking-tight">ARGOS</div>
-                <div className="text-lg font-black text-[#1E93AB] leading-none tracking-[0.3em]">SST</div>
-              </div>
-            </div>
+            <img 
+              src="/logo.png" 
+              alt="Logo Corporativo" 
+              className="h-20 w-auto object-contain"
+              onError={(e) => {
+                // Fallback por si la ruta no coincide exactamente
+                (e.target as HTMLImageElement).src = '/logo-minera.png';
+              }}
+            />
           </div>
-          <p className="text-gray-400 text-sm font-medium">
-            Inspecciona · Controla · Previene
+          <p className="text-gray-500 text-sm font-medium">
+            Sistema de Gestión SST
           </p>
         </div>
 
         {/* Formulario */}
         <form onSubmit={handleLogin} className="px-8 py-7 space-y-5">
           <div className="space-y-1.5">
-            <label className="block text-[11px] font-black text-gray-500 uppercase tracking-widest">
-              Correo
+            <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-widest">
+              Correo Electrónico
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <Mail className="h-4 w-4 text-gray-500" />
+                <Mail className="h-4 w-4 text-gray-400" />
               </div>
               <input
                 id="login-email"
@@ -107,19 +103,19 @@ function LoginForm() {
                 autoComplete="username"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="luis@argos.com"
-                className="block w-full pl-11 pr-4 py-3 bg-[#0F1923] border border-white/10 rounded-xl text-white placeholder-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E93AB] focus:border-transparent transition-all"
+                placeholder="usuario@empresa.com"
+                className="block w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-800 placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
               />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <label className="block text-[11px] font-black text-gray-500 uppercase tracking-widest">
+            <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-widest">
               Contraseña
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <Lock className="h-4 w-4 text-gray-500" />
+                <Lock className="h-4 w-4 text-gray-400" />
               </div>
               <input
                 id="login-password"
@@ -129,13 +125,13 @@ function LoginForm() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••••"
-                className="block w-full pl-11 pr-12 py-3 bg-[#0F1923] border border-white/10 rounded-xl text-white placeholder-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E93AB] focus:border-transparent transition-all"
+                className="block w-full pl-11 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-800 placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
               />
               <button
                 type="button"
                 id="toggle-password"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-500 hover:text-gray-300 transition-colors focus:outline-none"
+                className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 transition-colors focus:outline-none"
                 aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
               >
                 {showPassword
@@ -154,8 +150,8 @@ function LoginForm() {
               role="checkbox"
               aria-checked={rememberMe}
               onClick={() => setRememberMe(!rememberMe)}
-              className={`relative w-9 h-5 rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#1E93AB] focus:ring-offset-2 focus:ring-offset-[#162230] ${
-                rememberMe ? 'bg-[#1E93AB]' : 'bg-white/10'
+              className={`relative w-9 h-5 rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-white ${
+                rememberMe ? 'bg-blue-600' : 'bg-gray-200'
               }`}
             >
               <span
@@ -164,7 +160,7 @@ function LoginForm() {
                 }`}
               />
             </button>
-            <span className="text-sm text-gray-400 select-none cursor-pointer" onClick={() => setRememberMe(!rememberMe)}>
+            <span className="text-sm text-gray-600 select-none cursor-pointer" onClick={() => setRememberMe(!rememberMe)}>
               Recordar cuenta
             </span>
           </div>
@@ -174,7 +170,7 @@ function LoginForm() {
             id="login-submit"
             type="submit"
             disabled={loading}
-            className="w-full flex justify-center items-center gap-2 py-3.5 px-4 rounded-xl text-sm font-black text-white bg-gradient-to-r from-[#FF7F11] to-[#e66f00] hover:from-[#e66f00] hover:to-[#cc5f00] shadow-lg shadow-orange-900/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
+            className="w-full flex justify-center items-center gap-2 py-3.5 px-4 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
           >
             {loading && <Loader2 className="w-4 h-4 animate-spin" />}
             {loading ? 'Verificando...' : 'Iniciar Sesión'}
@@ -183,16 +179,16 @@ function LoginForm() {
 
         {/* Footer */}
         <div className="px-8 pb-7 text-center">
-          <p className="text-[11px] text-gray-600">
-            ¿Sin acceso? Contacta a tu administrador SST
+          <p className="text-[11px] text-gray-500">
+            ¿Problemas para acceder? Contacta a tu administrador
           </p>
         </div>
       </div>
 
       {/* Badge de seguridad */}
-      <div className="mt-5 flex items-center justify-center gap-2 text-gray-600">
+      <div className="mt-5 flex items-center justify-center gap-2 text-gray-500">
         <ShieldCheck className="w-3.5 h-3.5" />
-        <span className="text-[11px]">Acceso protegido · ARGOS SST v1.0</span>
+        <span className="text-[11px]">Acceso Seguro · Sistema SST</span>
       </div>
     </div>
   );
@@ -201,19 +197,9 @@ function LoginForm() {
 // ─── Página exportada con Suspense para evitar error de prerendering ──────────
 export default function LoginPage() {
   return (
-    <div className="min-h-screen bg-[#0F1923] flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Fondo decorativo */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
-        {[400, 600, 800, 1000].map((size, i) => (
-          <div
-            key={size}
-            className="absolute rounded-full border border-white/[0.04]"
-            style={{ width: size, height: size, animationDelay: `${i * 0.5}s` }}
-          />
-        ))}
-      </div>
-      <div className="absolute top-[-15%] right-[-10%] w-[500px] h-[500px] bg-[#FF7F11] opacity-[0.07] rounded-full blur-[100px] pointer-events-none" />
-      <div className="absolute bottom-[-15%] left-[-10%] w-[500px] h-[500px] bg-[#1E93AB] opacity-[0.07] rounded-full blur-[100px] pointer-events-none" />
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Fondo decorativo simple */}
+      <div className="absolute top-0 left-0 w-full h-64 bg-blue-600 rounded-b-[100px] opacity-10 pointer-events-none" />
 
       <Suspense fallback={
         <div className="flex items-center justify-center gap-3 text-gray-500">
