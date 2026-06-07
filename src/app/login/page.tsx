@@ -66,35 +66,48 @@ function LoginForm() {
 
   return (
     <div className="w-full max-w-sm z-10">
-      <div className="bg-white border border-gray-200 rounded-2xl shadow-xl overflow-hidden">
+      <div className="bg-white border border-[#DCDCDC] rounded-2xl shadow-xl overflow-hidden">
 
-        {/* Header con logo */}
-        <div className="px-8 pt-10 pb-6 text-center border-b border-gray-100">
-          <div className="flex justify-center mb-5">
-            <img 
-              src="/logo.png" 
-              alt="Logo Corporativo" 
-              className="h-20 w-auto object-contain"
-              onError={(e) => {
-                // Fallback por si la ruta no coincide exactamente
-                (e.target as HTMLImageElement).src = '/logo-minera.png';
-              }}
-            />
+        {/* Header con logo recreado */}
+        <div className="px-8 pt-10 pb-6 border-b border-[#DCDCDC]/50">
+          <div className="flex flex-col items-center">
+            <div className="flex items-center gap-3">
+              {/* Icono */}
+              <img 
+                src="/logo.png" 
+                alt="Icono Argos" 
+                className="h-[60px] w-auto object-contain"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = '/logo-minera.png';
+                }}
+              />
+              {/* Texto del logo */}
+              <div className="flex flex-col items-start">
+                <span className="text-[40px] font-black text-[#134686] leading-none tracking-tight">ARGOS</span>
+                <div className="flex items-center w-full justify-end mt-[-4px]">
+                  <div className="h-[3px] w-full bg-[#FF7F11] mr-1.5 rounded-full"></div>
+                  <span className="text-[22px] font-black text-[#1E93AB] leading-none tracking-wide">SST</span>
+                </div>
+              </div>
+            </div>
+            {/* Lema */}
+            <p className="mt-3 text-[12px] font-bold tracking-wide">
+              <span className="text-[#134686]">Inspecciona. </span>
+              <span className="text-[#1E93AB]">Controla. </span>
+              <span className="text-[#FF7F11]">Previene.</span>
+            </p>
           </div>
-          <p className="text-gray-500 text-sm font-medium">
-            Sistema de Gestión SST
-          </p>
         </div>
 
         {/* Formulario */}
         <form onSubmit={handleLogin} className="px-8 py-7 space-y-5">
           <div className="space-y-1.5">
-            <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-widest">
+            <label className="block text-[11px] font-bold text-[#134686] uppercase tracking-widest">
               Correo Electrónico
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <Mail className="h-4 w-4 text-gray-400" />
+                <Mail className="h-4 w-4 text-[#1E93AB]" />
               </div>
               <input
                 id="login-email"
@@ -104,18 +117,18 @@ function LoginForm() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="usuario@empresa.com"
-                className="block w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-800 placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                className="block w-full pl-11 pr-4 py-3 bg-[#F3F2EC]/50 border border-[#DCDCDC] rounded-xl text-[#134686] placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E93AB] focus:border-transparent transition-all"
               />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-widest">
+            <label className="block text-[11px] font-bold text-[#134686] uppercase tracking-widest">
               Contraseña
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <Lock className="h-4 w-4 text-gray-400" />
+                <Lock className="h-4 w-4 text-[#1E93AB]" />
               </div>
               <input
                 id="login-password"
@@ -125,13 +138,13 @@ function LoginForm() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••••"
-                className="block w-full pl-11 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-800 placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                className="block w-full pl-11 pr-12 py-3 bg-[#F3F2EC]/50 border border-[#DCDCDC] rounded-xl text-[#134686] placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E93AB] focus:border-transparent transition-all"
               />
               <button
                 type="button"
                 id="toggle-password"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 transition-colors focus:outline-none"
+                className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-[#1E93AB] transition-colors focus:outline-none"
                 aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
               >
                 {showPassword
@@ -150,8 +163,8 @@ function LoginForm() {
               role="checkbox"
               aria-checked={rememberMe}
               onClick={() => setRememberMe(!rememberMe)}
-              className={`relative w-9 h-5 rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-white ${
-                rememberMe ? 'bg-blue-600' : 'bg-gray-200'
+              className={`relative w-9 h-5 rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#1E93AB] focus:ring-offset-2 focus:ring-offset-white ${
+                rememberMe ? 'bg-[#1E93AB]' : 'bg-[#DCDCDC]'
               }`}
             >
               <span
@@ -160,7 +173,7 @@ function LoginForm() {
                 }`}
               />
             </button>
-            <span className="text-sm text-gray-600 select-none cursor-pointer" onClick={() => setRememberMe(!rememberMe)}>
+            <span className="text-sm text-[#134686] font-medium select-none cursor-pointer" onClick={() => setRememberMe(!rememberMe)}>
               Recordar cuenta
             </span>
           </div>
@@ -170,25 +183,18 @@ function LoginForm() {
             id="login-submit"
             type="submit"
             disabled={loading}
-            className="w-full flex justify-center items-center gap-2 py-3.5 px-4 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
+            className="w-full flex justify-center items-center gap-2 py-3.5 px-4 rounded-xl text-sm font-bold text-white bg-[#FF7F11] hover:bg-[#e66f00] shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
           >
             {loading && <Loader2 className="w-4 h-4 animate-spin" />}
             {loading ? 'Verificando...' : 'Iniciar Sesión'}
           </button>
         </form>
-
-        {/* Footer */}
-        <div className="px-8 pb-7 text-center">
-          <p className="text-[11px] text-gray-500">
-            ¿Problemas para acceder? Contacta a tu administrador
-          </p>
-        </div>
       </div>
 
       {/* Badge de seguridad */}
-      <div className="mt-5 flex items-center justify-center gap-2 text-gray-500">
+      <div className="mt-5 flex items-center justify-center gap-2 text-[#134686]/60">
         <ShieldCheck className="w-3.5 h-3.5" />
-        <span className="text-[11px]">Acceso Seguro · Sistema SST</span>
+        <span className="text-[11px] font-medium">Acceso Seguro · Sistema SST</span>
       </div>
     </div>
   );
@@ -197,14 +203,14 @@ function LoginForm() {
 // ─── Página exportada con Suspense para evitar error de prerendering ──────────
 export default function LoginPage() {
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Fondo decorativo simple */}
-      <div className="absolute top-0 left-0 w-full h-64 bg-blue-600 rounded-b-[100px] opacity-10 pointer-events-none" />
+    <div className="min-h-screen bg-[#F3F2EC] flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Fondo decorativo simple Naranja */}
+      <div className="absolute top-0 left-0 w-full h-[40vh] bg-[#FF7F11] rounded-b-[100px] opacity-10 pointer-events-none" />
 
       <Suspense fallback={
-        <div className="flex items-center justify-center gap-3 text-gray-500">
+        <div className="flex items-center justify-center gap-3 text-[#134686]">
           <Loader2 className="w-5 h-5 animate-spin" />
-          <span className="text-sm">Cargando...</span>
+          <span className="text-sm font-medium">Cargando...</span>
         </div>
       }>
         <LoginForm />
