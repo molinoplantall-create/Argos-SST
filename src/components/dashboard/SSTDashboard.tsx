@@ -33,10 +33,10 @@ const moduleSummary = [
     href: '/warehouse-inspections',
     icon: ClipboardCheck,
     color: '#1E93AB',
-    records: 6,
-    pending: 4,
-    signed: 3,
-    pdfs: 2,
+    records: 0,
+    pending: 0,
+    signed: 0,
+    pdfs: 0,
     status: 'Activo',
   },
   {
@@ -44,10 +44,10 @@ const moduleSummary = [
     href: '/epp-deliveries',
     icon: PackageCheck,
     color: '#FF7F11',
-    records: 8,
-    pending: 2,
-    signed: 6,
-    pdfs: 5,
+    records: 0,
+    pending: 0,
+    signed: 0,
+    pdfs: 0,
     status: 'Activo',
   },
   {
@@ -55,10 +55,10 @@ const moduleSummary = [
     href: '/epp-inspections',
     icon: ShieldCheck,
     color: '#134686',
-    records: 5,
-    pending: 3,
-    signed: 2,
-    pdfs: 2,
+    records: 0,
+    pending: 0,
+    signed: 0,
+    pdfs: 0,
     status: 'Activo',
   },
 ];
@@ -66,24 +66,19 @@ const moduleSummary = [
 const monthlyActivity = [
   { month: 'Ene', inspections: 0, deliveries: 0, eppInspections: 0 },
   { month: 'Feb', inspections: 0, deliveries: 0, eppInspections: 0 },
-  { month: 'Mar', inspections: 1, deliveries: 2, eppInspections: 0 },
-  { month: 'Abr', inspections: 2, deliveries: 2, eppInspections: 1 },
-  { month: 'May', inspections: 3, deliveries: 3, eppInspections: 2 },
-  { month: 'Jun', inspections: 6, deliveries: 8, eppInspections: 5 },
+  { month: 'Mar', inspections: 0, deliveries: 0, eppInspections: 0 },
+  { month: 'Abr', inspections: 0, deliveries: 0, eppInspections: 0 },
+  { month: 'May', inspections: 0, deliveries: 0, eppInspections: 0 },
+  { month: 'Jun', inspections: 0, deliveries: 0, eppInspections: 0 },
 ].slice(0, currentMonthIndex + 1);
 
 const findingStatus = [
-  { name: 'Conforme', value: 9, color: '#16A34A' },
-  { name: 'Pendiente', value: 6, color: '#FF7F11' },
-  { name: 'Critico', value: 2, color: '#E62727' },
+  { name: 'Conforme', value: 0, color: '#16A34A' },
+  { name: 'Pendiente', value: 0, color: '#FF7F11' },
+  { name: 'Critico', value: 0, color: '#E62727' },
 ];
 
-const recentActivity = [
-  { module: 'Entrega de EPP', detail: 'Registro con firmas y PDF generado', date: '06/06/2026', status: 'Completo' },
-  { module: 'Inspeccion de EPP', detail: 'EPP observado pendiente de cierre', date: '06/06/2026', status: 'Pendiente' },
-  { module: 'Inspecciones', detail: 'Inspeccion de area con hallazgos abiertos', date: '05/06/2026', status: 'En proceso' },
-  { module: 'Entrega de EPP', detail: 'Entrega registrada sin PDF final', date: '04/06/2026', status: 'Pendiente' },
-];
+const recentActivity: any[] = [];
 
 function Panel({ children, className }: { children: React.ReactNode; className?: string }) {
   return <section className={cn('rounded-lg border border-[#DCDCDC] bg-white p-4 shadow-sm', className)}>{children}</section>;
