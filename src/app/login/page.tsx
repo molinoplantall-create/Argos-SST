@@ -188,42 +188,6 @@ function LoginForm() {
             {loading && <Loader2 className="w-4 h-4 animate-spin" />}
             {loading ? 'Verificando...' : 'Iniciar Sesión'}
           </button>
-
-          {/* BOTÓN TEMPORAL PARA CREAR EL USUARIO - BORRAR DESPUÉS DE USAR */}
-          <button
-            type="button"
-            onClick={async () => {
-              if (!email || !password) {
-                alert('Escribe luis@argos.com y argos123 arriba primero.');
-                return;
-              }
-              // 1. Crear el usuario en auth.users
-              const { data, error } = await supabase.auth.signUp({ email, password });
-              if (error) {
-                alert("Error Auth: " + error.message);
-                return;
-              }
-              // 2. Insertarlo en public.profiles con el rol SUPERADMIN que vimos en tu error
-              if (data?.user) {
-                const { error: profileError } = await supabase.from('profiles').insert([
-                  { 
-                    id: data.user.id, 
-                    email: email, 
-                    full_name: 'Luis Admin',
-                    role_id: '6833b31f-eda2-4bfd-a9ec-325f8d986522'
-                  }
-                ]);
-                if (profileError) {
-                  alert("Usuario creado en Auth, pero falló perfil: " + profileError.message);
-                } else {
-                  alert("¡CREADO CON ÉXITO! Ahora dale al botón naranja de Iniciar Sesión.");
-                }
-              }
-            }}
-            className="w-full flex justify-center items-center gap-2 py-3 px-4 mt-3 rounded-xl text-sm font-bold text-[#134686] bg-[#DCDCDC] hover:bg-gray-300 transition-all border border-[#134686]/20"
-          >
-            1. CLIC AQUÍ PRIMERO (Crear Admin)
-          </button>
         </form>
       </div>
 
