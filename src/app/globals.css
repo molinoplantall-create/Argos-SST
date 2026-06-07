@@ -43,3 +43,17 @@ body {
 .shadow-premium {
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
 }
+
+/* Input estándar reutilizable en todo el sistema */
+.input-std {
+  @apply w-full px-4 py-2.5 text-sm border border-[#DCDCDC] rounded-xl bg-white text-[#1a1a1a] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1E93AB] focus:border-transparent transition-all;
+}
+
+/* Safe area para iPhone con notch — bottom nav */
+.safe-area-inset-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
