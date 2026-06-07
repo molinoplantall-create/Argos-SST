@@ -74,11 +74,11 @@ function LoginForm() {
             <div className="flex items-center gap-3">
               {/* Icono */}
               <img 
-                src="/logo.png" 
+                src="/logo.jpg" 
                 alt="Icono Argos" 
                 className="h-[60px] w-auto object-contain"
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = '/logo-minera.png';
+                  (e.target as HTMLImageElement).src = '/logo.png';
                 }}
               />
               {/* Texto del logo */}
@@ -117,7 +117,7 @@ function LoginForm() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="usuario@empresa.com"
-                className="block w-full pl-11 pr-4 py-3 bg-[#F3F2EC]/50 border border-[#DCDCDC] rounded-xl text-[#134686] placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E93AB] focus:border-transparent transition-all"
+                className="block w-full pl-11 pr-4 py-3 bg-white border border-[#DCDCDC] rounded-xl text-[#134686] placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E93AB] focus:border-transparent transition-all"
               />
             </div>
           </div>
@@ -138,7 +138,7 @@ function LoginForm() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••••"
-                className="block w-full pl-11 pr-12 py-3 bg-[#F3F2EC]/50 border border-[#DCDCDC] rounded-xl text-[#134686] placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E93AB] focus:border-transparent transition-all"
+                className="block w-full pl-11 pr-12 py-3 bg-white border border-[#DCDCDC] rounded-xl text-[#134686] placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#1E93AB] focus:border-transparent transition-all"
               />
               <button
                 type="button"
@@ -203,7 +203,7 @@ function LoginForm() {
 // ─── Página exportada con Suspense para evitar error de prerendering ──────────
 export default function LoginPage() {
   return (
-    <div className="min-h-screen bg-[#F3F2EC] flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-screen bg-white flex items-center justify-center p-4 relative overflow-hidden">
       {/* Fondo decorativo simple Naranja */}
       <div className="absolute top-0 left-0 w-full h-[40vh] bg-[#FF7F11] rounded-b-[100px] opacity-10 pointer-events-none" />
 
