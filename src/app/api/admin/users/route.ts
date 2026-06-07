@@ -13,37 +13,40 @@ function getAdminClient() {
 }
 
 // Verificar que el usuario que hace la petición sea ADMIN o SUPERADMIN
-async function verifyAdminAccess(): Promise<boolean> {
+async function verifyAdminAccess(): Promise<{ allowed: boolean; reason?: string }> {
   try {
     const supabase = await createServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return false;
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (!user) return { allowed: false, reason: 'No user found in session' };
 
     // Usamos el admin client para leer el rol y esquivar posibles bloqueos de RLS
     const admin = getAdminClient();
     const { data: profile, error } = await admin
       .from('profiles')
-      .select('roles(name)')
+      .select('roles(name), role_id')
       .eq('id', user.id)
       .single();
 
     if (error) {
-      console.error('Error fetching profile role:', error);
-      return false;
+      return { allowed: false, reason: `Error fetching profile role: ${error.message}` };
     }
 
     const roleName = (profile?.roles as any)?.name;
-    return ['SUPERADMIN', 'ADMIN_SST'].includes(roleName);
-  } catch (err) {
-    console.error('Exception in verifyAdminAccess:', err);
-    return false;
+    if (['SUPERADMIN', 'ADMIN_SST'].includes(roleName)) {
+      return { allowed: true };
+    } else {
+      return { allowed: false, reason: `Role mismatch. Expected SUPERADMIN/ADMIN_SST, got ${roleName}. role_id is ${profile?.role_id}` };
+    }
+  } catch (err: any) {
+    return { allowed: false, reason: `Exception in verifyAdminAccess: ${err.message}` };
   }
 }
 
 // ─── GET — Listar todos los usuarios con sus perfiles ───────────────────────
 export async function GET() {
-  if (!await verifyAdminAccess()) {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+  const access = await verifyAdminAccess();
+  if (!access.allowed) {
+    return NextResponse.json({ error: `No autorizado: ${access.reason}` }, { status: 403 });
   }
 
   try {
@@ -83,8 +86,9 @@ export async function GET() {
 
 // ─── POST — Crear nuevo usuario ─────────────────────────────────────────────
 export async function POST(req: NextRequest) {
-  if (!await verifyAdminAccess()) {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+  const access = await verifyAdminAccess();
+  if (!access.allowed) {
+    return NextResponse.json({ error: `No autorizado: ${access.reason}` }, { status: 403 });
   }
 
   try {
@@ -151,8 +155,9 @@ export async function POST(req: NextRequest) {
 
 // ─── PATCH — Cambiar contraseña o estado activo ──────────────────────────────
 export async function PATCH(req: NextRequest) {
-  if (!await verifyAdminAccess()) {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+  const access = await verifyAdminAccess();
+  if (!access.allowed) {
+    return NextResponse.json({ error: `No autorizado: ${access.reason}` }, { status: 403 });
   }
 
   try {
@@ -193,8 +198,9 @@ export async function PATCH(req: NextRequest) {
 
 // ─── DELETE — Eliminar usuario ────────────────────────────────────────────────
 export async function DELETE(req: NextRequest) {
-  if (!await verifyAdminAccess()) {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+  const access = await verifyAdminAccess();
+  if (!access.allowed) {
+    return NextResponse.json({ error: `No autorizado: ${access.reason}` }, { status: 403 });
   }
 
   try {

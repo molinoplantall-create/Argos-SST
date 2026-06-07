@@ -311,7 +311,8 @@ function UsersTab() {
       const json = await usersRes.json();
       setUsers(json.users ?? []);
     } else {
-      showToast('No tienes permisos para ver usuarios o falta SUPABASE_SERVICE_ROLE_KEY.', 'error');
+      const json = await usersRes.json();
+      showToast(json.error || 'No tienes permisos para ver usuarios.', 'error');
     }
 
     if (!rolesRes.error) setRoles(rolesRes.data ?? []);

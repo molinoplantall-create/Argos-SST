@@ -55,7 +55,7 @@ function DesktopSidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="hidden md:flex flex-col w-64 bg-[#111827] text-white min-h-screen sticky top-0 shrink-0">
+    <aside className="hidden md:flex flex-col w-64 bg-[#134686] text-white min-h-screen sticky top-0 shrink-0">
       {/* Logo */}
       <div className="p-6 border-b border-white/10">
         <div className="flex items-center gap-3">
