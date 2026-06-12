@@ -10,7 +10,8 @@ import {
   Settings as SettingsIcon, Map, Users, Database,
   AlertCircle, RefreshCw, Plus, Trash2, KeyRound,
   Shield, User, Mail, CheckCircle2, XCircle,
-  ChevronDown, Eye, EyeOff, Loader2, X, Building2
+  ChevronDown, Eye, EyeOff, Loader2, X, Building2,
+  HardHat, UserRound, Package, Upload
 } from 'lucide-react';
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
@@ -562,12 +563,226 @@ function AreasTab() {
   );
 }
 
+// ─── TAB: Trabajadores ────────────────────────────────────────────────────────
+function WorkersTab() {
+  const { showToast, showConfirm } = useFeedback();
+  const [workers, setWorkers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState({ fullName: '', documentNumber: '', position: '', area: '' });
+  const [adding, setAdding] = useState(false);
+
+  const loadWorkers = async () => {
+    setLoading(true);
+    const { data } = await supabase.from('workers').select('*').order('full_name');
+    setWorkers(data ?? []);
+    setLoading(false);
+  };
+
+  useEffect(() => { loadWorkers(); }, []);
+
+  const handleAddWorker = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.fullName.trim() || !form.documentNumber.trim()) return;
+    setAdding(true);
+    
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data: profile } = await supabase.from('profiles').select('client_id').eq('id', user!.id).single();
+    
+    const { error } = await supabase.from('workers').insert({
+      full_name: form.fullName.trim(),
+      document_number: form.documentNumber.trim(),
+      position: form.position.trim(),
+      area: form.area.trim(),
+      client_id: (profile as any)?.client_id,
+    });
+    setAdding(false);
+    
+    if (error) {
+      showToast('Error al agregar trabajador.', 'error');
+    } else {
+      showToast('Trabajador agregado.', 'success');
+      setForm({ fullName: '', documentNumber: '', position: '', area: '' });
+      loadWorkers();
+    }
+  };
+
+  const handleDelete = (id: string, name: string) => {
+    showConfirm({
+      title: 'Eliminar Trabajador',
+      message: `¿Seguro que deseas eliminar a ${name}? Esto afectará a sus entregas de EPP si existen.`,
+      onConfirm: async () => {
+        const { error } = await supabase.from('workers').delete().eq('id', id);
+        if (error) showToast('Error al eliminar.', 'error');
+        else { showToast('Trabajador eliminado.', 'success'); loadWorkers(); }
+      }
+    });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <h2 className="text-lg font-black text-[#134686]">Gestión de Trabajadores</h2>
+        <button className="flex items-center gap-2 px-4 py-2 bg-white border border-[#DCDCDC] rounded-xl text-sm font-bold text-gray-600 hover:border-[#1E93AB] transition-all self-start sm:self-auto">
+          <Upload className="w-4 h-4" /> Carga Masiva (Plantilla)
+        </button>
+      </div>
+
+      <form onSubmit={handleAddWorker} className="bg-white border border-[#DCDCDC] p-4 rounded-xl space-y-3">
+        <p className="text-sm font-bold text-[#1a1a1a]">Agregar Trabajador</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <input required type="text" placeholder="DNI / Documento" value={form.documentNumber} onChange={e => setForm({...form, documentNumber: e.target.value})} className="input-std" />
+          <input required type="text" placeholder="Nombre Completo" value={form.fullName} onChange={e => setForm({...form, fullName: e.target.value})} className="input-std" />
+          <input type="text" placeholder="Cargo" value={form.position} onChange={e => setForm({...form, position: e.target.value})} className="input-std" />
+          <input type="text" placeholder="Área" value={form.area} onChange={e => setForm({...form, area: e.target.value})} className="input-std" />
+        </div>
+        <button type="submit" disabled={adding} className="w-full sm:w-auto px-4 py-2.5 bg-[#1E93AB] text-white rounded-xl text-sm font-bold hover:bg-[#167082] transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+          {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Agregar
+        </button>
+      </form>
+
+      {loading ? (
+        <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 text-[#1E93AB] animate-spin" /></div>
+      ) : workers.length === 0 ? (
+        <div className="text-center py-10 text-gray-400">
+          <UserRound className="w-10 h-10 mx-auto mb-2 opacity-30" />
+          <p className="text-sm">No hay trabajadores registrados.</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {workers.map((worker) => (
+            <div key={worker.id} className="flex items-center justify-between bg-white border border-[#DCDCDC] rounded-xl px-4 py-3">
+              <div>
+                <p className="font-black text-[#1a1a1a] text-sm">{worker.full_name} <span className="text-xs text-gray-500 font-normal">({worker.document_number})</span></p>
+                <p className="text-xs text-gray-500">{worker.position} {worker.area && `- ${worker.area}`}</p>
+              </div>
+              <button onClick={() => handleDelete(worker.id, worker.full_name)} className="p-2 text-gray-400 hover:text-red-500 transition-colors">
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── TAB: Catálogo EPP ────────────────────────────────────────────────────────
+function EppCatalogTab() {
+  const { showToast, showConfirm } = useFeedback();
+  const [catalog, setCatalog] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState({ name: '', bodyZone: '', unit: 'Unidad', certification: '' });
+  const [adding, setAdding] = useState(false);
+
+  const loadCatalog = async () => {
+    setLoading(true);
+    const { data } = await supabase.from('epp_catalog').select('*').order('name');
+    setCatalog(data ?? []);
+    setLoading(false);
+  };
+
+  useEffect(() => { loadCatalog(); }, []);
+
+  const handleAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.name.trim() || !form.bodyZone.trim()) return;
+    setAdding(true);
+    
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data: profile } = await supabase.from('profiles').select('client_id').eq('id', user!.id).single();
+    
+    const { error } = await supabase.from('epp_catalog').insert({
+      name: form.name.trim(),
+      body_zone: form.bodyZone.trim(),
+      unit: form.unit.trim(),
+      certification: form.certification.trim(),
+      client_id: (profile as any)?.client_id,
+    });
+    setAdding(false);
+    
+    if (error) {
+      showToast('Error al agregar EPP.', 'error');
+    } else {
+      showToast('EPP agregado al catálogo.', 'success');
+      setForm({ name: '', bodyZone: '', unit: 'Unidad', certification: '' });
+      loadCatalog();
+    }
+  };
+
+  const handleDelete = (id: string, name: string) => {
+    showConfirm({
+      title: 'Eliminar EPP',
+      message: `¿Seguro que deseas eliminar ${name}? Esto afectará a sus historiales si existen.`,
+      onConfirm: async () => {
+        const { error } = await supabase.from('epp_catalog').delete().eq('id', id);
+        if (error) showToast('Error al eliminar.', 'error');
+        else { showToast('EPP eliminado.', 'success'); loadCatalog(); }
+      }
+    });
+  };
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-lg font-black text-[#134686]">Catálogo de EPP</h2>
+
+      <form onSubmit={handleAdd} className="bg-white border border-[#DCDCDC] p-4 rounded-xl space-y-3">
+        <p className="text-sm font-bold text-[#1a1a1a]">Agregar EPP</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <input required type="text" placeholder="Nombre EPP (Ej: Casco)" value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="input-std" />
+          <select required value={form.bodyZone} onChange={e => setForm({...form, bodyZone: e.target.value})} className="input-std">
+            <option value="">Zona del Cuerpo</option>
+            <option value="CABEZA">Cabeza</option>
+            <option value="OJOS">Ojos</option>
+            <option value="OIDOS">Oídos</option>
+            <option value="RESPIRATORIO">Respiratorio</option>
+            <option value="TORSO">Torso</option>
+            <option value="MANOS">Manos</option>
+            <option value="PIERNAS">Piernas</option>
+            <option value="PIES">Pies</option>
+            <option value="OTROS">Otros</option>
+          </select>
+          <input type="text" placeholder="Unidad (Ej: Unidad, Par)" value={form.unit} onChange={e => setForm({...form, unit: e.target.value})} className="input-std" />
+          <input type="text" placeholder="Certificación (Opcional)" value={form.certification} onChange={e => setForm({...form, certification: e.target.value})} className="input-std" />
+        </div>
+        <button type="submit" disabled={adding} className="w-full sm:w-auto px-4 py-2.5 bg-[#FF7F11] text-white rounded-xl text-sm font-bold hover:bg-[#e66f00] transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+          {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Agregar al Catálogo
+        </button>
+      </form>
+
+      {loading ? (
+        <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 text-[#1E93AB] animate-spin" /></div>
+      ) : catalog.length === 0 ? (
+        <div className="text-center py-10 text-gray-400">
+          <Package className="w-10 h-10 mx-auto mb-2 opacity-30" />
+          <p className="text-sm">El catálogo está vacío.</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {catalog.map((item) => (
+            <div key={item.id} className="flex items-center justify-between bg-white border border-[#DCDCDC] rounded-xl px-4 py-3">
+              <div>
+                <p className="font-black text-[#1a1a1a] text-sm">{item.name}</p>
+                <p className="text-xs text-gray-500">Zona: {item.body_zone} | {item.unit} {item.certification && `| Cert: ${item.certification}`}</p>
+              </div>
+              <button onClick={() => handleDelete(item.id, item.name)} className="p-2 text-gray-400 hover:text-red-500 transition-colors">
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── PÁGINA PRINCIPAL ────────────────────────────────────────────────────────
-type TabId = 'areas' | 'users' | 'system';
+type TabId = 'areas' | 'users' | 'workers' | 'epp_catalog' | 'system';
 
 const TABS: { id: TabId; label: string; icon: any }[] = [
   { id: 'areas',  label: 'Áreas de Planta', icon: Map },
   { id: 'users',  label: 'Usuarios',         icon: Users },
+  { id: 'workers', label: 'Trabajadores',    icon: UserRound },
+  { id: 'epp_catalog', label: 'Catálogo EPP', icon: HardHat },
   { id: 'system', label: 'Sistema',           icon: Database },
 ];
 
@@ -605,6 +820,8 @@ export default function SettingsPage() {
         <div>
           {activeTab === 'areas'  && <AreasTab />}
           {activeTab === 'users'  && <UsersTab />}
+          {activeTab === 'workers'  && <WorkersTab />}
+          {activeTab === 'epp_catalog'  && <EppCatalogTab />}
           {activeTab === 'system' && (
             <div className="card-industrial text-center py-16 space-y-3 text-gray-400">
               <Database className="w-12 h-12 mx-auto opacity-30" />

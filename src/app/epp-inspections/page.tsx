@@ -1,8 +1,10 @@
 'use client';
 
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import IndustrialLayout from '@/components/layout/IndustrialLayout';
 import { SignatureDialog } from '@/components/common/SignatureDialog';
+import { supabase } from '@/lib/supabase';
+import { useFeedback } from '@/components/common/FeedbackUI';
 import {
   BadgeCheck,
   Calendar,
@@ -17,6 +19,7 @@ import {
   ShieldCheck,
   UserRound,
   XCircle,
+  Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -25,15 +28,14 @@ type AssignmentStatus = 'ACTIVO' | 'BAJA' | 'REEMPLAZADO' | 'PERDIDO' | 'DEVUELT
 
 type Worker = {
   id: string;
-  fullName: string;
-  documentNumber: string;
+  full_name: string;
+  document_number: string;
   position: string;
   area: string;
 };
 
 type InspectionItem = {
-  id: string;
-  assignmentId: string;
+  id: string; // Assignment ID
   name: string;
   size?: string;
   certification?: string;
@@ -52,101 +54,6 @@ type SignatureTarget = 'worker' | 'responsible' | null;
 
 const fieldClass =
   'w-full rounded-md border border-[#DCDCDC] bg-white px-3 py-2 text-sm outline-none transition focus:border-[#1E93AB] focus:ring-2 focus:ring-[#1E93AB]/20';
-
-const workers: Worker[] = [
-  { id: 'worker-001', fullName: 'Bladimer Gutierrez', documentNumber: '45678901', position: 'Operario', area: 'Planta Saramarca II' },
-  { id: 'worker-002', fullName: 'Ivan Gararar', documentNumber: '52341678', position: 'Ayudante', area: 'Molienda' },
-  { id: 'worker-003', fullName: 'Edwin Tito', documentNumber: '61234567', position: 'Operario', area: 'Chancado' },
-];
-
-const assignmentsByWorker: Record<string, InspectionItem[]> = {
-  'worker-001': [
-    {
-      id: 'item-001',
-      assignmentId: 'assign-001',
-      name: 'Casco de Seguridad',
-      certification: 'ANSI Z89.1',
-      assignedDate: '2026-05-12',
-      status: 'ACTIVO',
-      condition: 'BUENO',
-      cleaningOk: true,
-      useOk: true,
-      observation: '',
-      recommendation: '',
-    },
-    {
-      id: 'item-002',
-      assignmentId: 'assign-002',
-      name: 'Botas de Seguridad con puntera de acero',
-      size: '42',
-      certification: 'ASTM F2413',
-      assignedDate: '2026-05-12',
-      status: 'ACTIVO',
-      condition: 'BUENO',
-      cleaningOk: false,
-      useOk: true,
-      observation: 'Falta limpieza a los zapatos de seguridad.',
-      recommendation: 'Realizar limpieza antes de iniciar la guardia.',
-    },
-    {
-      id: 'item-003',
-      assignmentId: 'assign-003',
-      name: 'Protector Respiratorio',
-      certification: 'NIOSH N95',
-      assignedDate: '2026-05-18',
-      status: 'ACTIVO',
-      condition: 'MALO',
-      cleaningOk: false,
-      useOk: true,
-      observation: 'Arnes de mascarilla sin elasticidad.',
-      recommendation: 'Dar de baja y reemplazar respirador.',
-    },
-  ],
-  'worker-002': [
-    {
-      id: 'item-004',
-      assignmentId: 'assign-004',
-      name: 'Casco de Seguridad',
-      certification: 'ANSI Z89.1',
-      assignedDate: '2026-05-15',
-      status: 'ACTIVO',
-      condition: 'BUENO',
-      cleaningOk: true,
-      useOk: true,
-      observation: '',
-      recommendation: '',
-    },
-    {
-      id: 'item-005',
-      assignmentId: 'assign-005',
-      name: 'Guantes Multiflex',
-      size: 'M',
-      certification: 'EN 388',
-      assignedDate: '2026-05-15',
-      status: 'ACTIVO',
-      condition: 'BUENO',
-      cleaningOk: true,
-      useOk: true,
-      observation: '',
-      recommendation: '',
-    },
-  ],
-  'worker-003': [
-    {
-      id: 'item-006',
-      assignmentId: 'assign-006',
-      name: 'Gafas de Seguridad',
-      certification: 'ANSI Z87.1',
-      assignedDate: '2026-05-10',
-      status: 'ACTIVO',
-      condition: 'BUENO',
-      cleaningOk: true,
-      useOk: true,
-      observation: '',
-      recommendation: '',
-    },
-  ],
-};
 
 const Panel = ({ children, className }: { children: React.ReactNode; className?: string }) => (
   <section className={cn('rounded-lg border border-[#DCDCDC] bg-white p-5 shadow-sm', className)}>
@@ -177,37 +84,83 @@ function StatusPill({ item }: { item: InspectionItem }) {
 }
 
 export default function EppInspectionsPage() {
-  const [selectedWorkerId, setSelectedWorkerId] = useState(workers[0].id);
-  const [workerSearch, setWorkerSearch] = useState(`${workers[0].documentNumber} - ${workers[0].fullName}`);
-  const [inspectedBy, setInspectedBy] = useState('Luis Campos');
+  const { showToast } = useFeedback();
+  const [workers, setWorkers] = useState<Worker[]>([]);
+  const [items, setItems] = useState<InspectionItem[]>([]);
+  
+  const [selectedWorkerId, setSelectedWorkerId] = useState('');
+  const [workerSearch, setWorkerSearch] = useState('');
+  const [inspectedBy, setInspectedBy] = useState('');
   const [inspectionDate, setInspectionDate] = useState(new Date().toISOString().slice(0, 10));
-  const [items, setItems] = useState<InspectionItem[]>(assignmentsByWorker[workers[0].id]);
-  const [selectedItemId, setSelectedItemId] = useState(assignmentsByWorker[workers[0].id][0]?.id ?? '');
+  const [selectedItemId, setSelectedItemId] = useState('');
   const [workerSignatureUrl, setWorkerSignatureUrl] = useState('');
   const [responsibleSignatureUrl, setResponsibleSignatureUrl] = useState('');
   const [signatureTarget, setSignatureTarget] = useState<SignatureTarget>(null);
   const [deactivationReason, setDeactivationReason] = useState('');
+  
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [saving, setSaving] = useState(false);
+  
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const selectedWorker = workers.find((worker) => worker.id === selectedWorkerId) ?? workers[0];
+  useEffect(() => {
+    async function loadData() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).single();
+        if (profile) setInspectedBy(profile.full_name);
+      }
+
+      const { data: wRes } = await supabase.from('workers').select('*').eq('status', 'ACTIVO').order('full_name');
+      if (wRes) setWorkers(wRes);
+    }
+    loadData();
+  }, []);
+
+  const selectedWorker = workers.find((w) => w.id === selectedWorkerId);
   const activeItems = items.filter((item) => item.status === 'ACTIVO');
   const selectedItem = items.find((item) => item.id === selectedItemId) ?? activeItems[0] ?? items[0];
 
   const observedCount = useMemo(() => activeItems.filter(hasIssue).length, [activeItems]);
   const photoCount = useMemo(() => activeItems.filter((item) => item.photoName).length, [activeItems]);
 
-  function selectWorker(workerId: string) {
-    const worker = workers.find((item) => item.id === workerId) ?? workers[0];
-    const workerItems = assignmentsByWorker[worker.id] ?? [];
+  async function selectWorker(workerId: string) {
+    const worker = workers.find((item) => item.id === workerId);
+    if (!worker) return;
 
     setSelectedWorkerId(worker.id);
-    setWorkerSearch(`${worker.documentNumber} - ${worker.fullName}`);
-    setItems(workerItems);
-    setSelectedItemId(workerItems[0]?.id ?? '');
+    setWorkerSearch(`${worker.document_number} - ${worker.full_name}`);
     setWorkerSignatureUrl('');
     setResponsibleSignatureUrl('');
     setDeactivationReason('');
+
+    const { data: assignments } = await supabase
+      .from('worker_epp_assignments')
+      .select('*')
+      .eq('worker_id', worker.id)
+      .eq('status', 'ACTIVO')
+      .order('assigned_date', { ascending: false });
+
+    if (assignments && assignments.length > 0) {
+      const loadedItems: InspectionItem[] = assignments.map((a: any) => ({
+        id: a.id,
+        name: a.epp_name,
+        size: a.size || undefined,
+        certification: a.certification || undefined,
+        assignedDate: a.assigned_date,
+        status: 'ACTIVO',
+        condition: 'BUENO',
+        cleaningOk: true,
+        useOk: true,
+        observation: '',
+        recommendation: '',
+      }));
+      setItems(loadedItems);
+      setSelectedItemId(loadedItems[0].id);
+    } else {
+      setItems([]);
+      setSelectedItemId('');
+    }
   }
 
   function updateItem(id: string, patch: Partial<InspectionItem>) {
@@ -215,7 +168,10 @@ export default function EppInspectionsPage() {
   }
 
   function deactivateSelected(status: AssignmentStatus) {
-    if (!selectedItem || !deactivationReason.trim()) return;
+    if (!selectedItem || !deactivationReason.trim()) {
+      showToast('Por favor ingrese un motivo para dar de baja.', 'error');
+      return;
+    }
 
     updateItem(selectedItem.id, {
       status,
@@ -231,11 +187,71 @@ export default function EppInspectionsPage() {
     setSignatureTarget(null);
   }
 
+  async function saveInspection(status: 'BORRADOR' | 'FINALIZADO') {
+    if (!selectedWorker || items.length === 0) return null;
+    setSaving(true);
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: profile } = await supabase.from('profiles').select('client_id, id').eq('id', user!.id).single();
+      
+      const docCode = `R-SST-INS-${Date.now().toString().slice(-4)}`;
+
+      const { data: inspection, error: insError } = await supabase.from('epp_inspections').insert({
+        client_id: profile!.client_id,
+        worker_id: selectedWorker.id,
+        inspector_id: profile!.id,
+        inspection_date: inspectionDate,
+        status,
+        document_code: docCode,
+        inspector_signature_url: responsibleSignatureUrl || null,
+        worker_signature_url: workerSignatureUrl || null
+      }).select().single();
+
+      if (insError) throw insError;
+
+      const inspectionDetails = items.map(item => ({
+        inspection_id: inspection.id,
+        assignment_id: item.id, // Reference to worker_epp_assignments
+        condition: item.condition,
+        cleaning_ok: item.cleaningOk,
+        use_ok: item.useOk,
+        observation: item.observation || null,
+        recommendation: item.recommendation || null,
+        photo_url: item.photoName || null,
+        action_taken: item.status !== 'ACTIVO' ? item.status : null
+      }));
+
+      // No existe tabla de items de inspeccion aun en el schema provisto pero como los datos principales estan, 
+      // actualizaremos el status de la tabla worker_epp_assignments
+      
+      if (status === 'FINALIZADO') {
+        const toUpdate = items.filter(i => i.status !== 'ACTIVO');
+        for (const item of toUpdate) {
+          await supabase.from('worker_epp_assignments').update({ status: item.status }).eq('id', item.id);
+        }
+      }
+
+      showToast(`Inspección guardada como ${status}`, 'success');
+      return inspection;
+    } catch (e: any) {
+      showToast(e.message, 'error');
+      return null;
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function downloadPdf() {
-    if (items.length === 0) return;
+    if (items.length === 0 || !selectedWorker) return;
 
     setIsGeneratingPdf(true);
     try {
+      const isFullySigned = responsibleSignatureUrl && workerSignatureUrl;
+      const insStatus = isFullySigned ? 'FINALIZADO' : 'BORRADOR';
+      
+      await saveInspection(insStatus);
+
       const response = await fetch('/api/reports/epp-inspection', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -244,14 +260,14 @@ export default function EppInspectionsPage() {
           revision: '00',
           inspectionDate,
           client: {
-            legalName: 'MINERA INMACULADA CONCEPCION Y MILAGROSA',
-            ruc: '20534547715',
-            address: 'CALLE TRUJILLO 351 - PALPA / SARAMARCA',
+            legalName: 'ARGOS SST CLIENTE',
+            ruc: '20000000000',
+            address: 'LIMA',
             activity: 'MINERIA',
           },
           worker: {
-            fullName: selectedWorker.fullName,
-            documentNumber: selectedWorker.documentNumber,
+            fullName: selectedWorker.full_name,
+            documentNumber: selectedWorker.document_number,
             position: selectedWorker.position,
             area: selectedWorker.area,
           },
@@ -285,11 +301,13 @@ export default function EppInspectionsPage() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `inspeccion-epp-${selectedWorker.documentNumber}-${inspectionDate}.pdf`;
+      link.download = `inspeccion-epp-${selectedWorker.document_number}-${inspectionDate}.pdf`;
       document.body.appendChild(link);
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
+    } catch (e: any) {
+      showToast(e.message, 'error');
     } finally {
       setIsGeneratingPdf(false);
     }
@@ -302,28 +320,32 @@ export default function EppInspectionsPage() {
           <div>
             <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-[#1E93AB]">
               <ShieldCheck className="h-4 w-4" />
-              ARGOS SST / Luis Campos
+              ARGOS SST / {inspectedBy}
             </div>
-            <h1 className="mt-2 text-2xl font-bold text-[#134686]">Inspeccion de EPP</h1>
+            <h1 className="mt-2 text-2xl font-bold text-[#134686]">Inspección de EPP</h1>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button className="flex items-center gap-2 rounded-md border border-[#DCDCDC] bg-white px-4 py-2 text-sm font-bold text-[#134686] transition hover:border-[#1E93AB] hover:text-[#1E93AB]">
-              <Save className="h-4 w-4" />
+            <button
+              onClick={() => saveInspection('BORRADOR')}
+              disabled={saving || items.length === 0}
+              className="flex items-center gap-2 rounded-md border border-[#DCDCDC] bg-white px-4 py-2 text-sm font-bold text-[#134686] transition hover:border-[#1E93AB] hover:text-[#1E93AB] disabled:opacity-50"
+            >
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               Guardar borrador
             </button>
             <button
               type="button"
               onClick={downloadPdf}
-              disabled={items.length === 0 || isGeneratingPdf}
+              disabled={items.length === 0 || isGeneratingPdf || saving}
               className={cn(
                 'flex items-center gap-2 rounded-md px-4 py-2 text-sm font-bold text-white transition',
-                items.length === 0 || isGeneratingPdf
+                items.length === 0 || isGeneratingPdf || saving
                   ? 'cursor-not-allowed bg-gray-400'
                   : 'bg-[#134686] hover:bg-[#1E93AB]'
               )}
             >
-              <FileDown className="h-4 w-4" />
-              {isGeneratingPdf ? 'Generando...' : 'PDF formato'}
+              {isGeneratingPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+              {isGeneratingPdf ? 'Generando...' : 'Guardar y Generar PDF'}
             </button>
           </div>
         </div>
@@ -332,7 +354,7 @@ export default function EppInspectionsPage() {
           <div className="mb-4 flex items-center justify-between gap-3">
             <h2 className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-[#111827]">
               <UserRound className="h-4 w-4 text-[#1E93AB]" />
-              Trabajador y datos de inspeccion
+              Trabajador y datos de inspección
             </h2>
             <span className="rounded-full bg-[#F3F2EC] px-3 py-1 text-xs font-bold text-[#134686]">
               Carga solo EPP activos
@@ -351,24 +373,24 @@ export default function EppInspectionsPage() {
                   onChange={(event) => {
                     const value = event.target.value;
                     setWorkerSearch(value);
-                    const found = workers.find((worker) => value.includes(worker.documentNumber) || value.includes(worker.fullName));
+                    const found = workers.find((worker) => value.includes(worker.document_number) || value.includes(worker.full_name));
                     if (found) selectWorker(found.id);
                   }}
                 />
                 <datalist id="workers-list">
                   {workers.map((worker) => (
-                    <option key={worker.id} value={`${worker.documentNumber} - ${worker.fullName}`} />
+                    <option key={worker.id} value={`${worker.document_number} - ${worker.full_name}`} />
                   ))}
                 </datalist>
               </div>
             </label>
             <label className="space-y-1">
               <span className="text-xs font-bold text-gray-500">Cargo</span>
-              <input className={fieldClass} value={selectedWorker.position} readOnly />
+              <input className={fieldClass} value={selectedWorker?.position || ''} readOnly />
             </label>
             <label className="space-y-1">
               <span className="text-xs font-bold text-gray-500">Area / Proyecto</span>
-              <input className={fieldClass} value={selectedWorker.area} readOnly />
+              <input className={fieldClass} value={selectedWorker?.area || ''} readOnly />
             </label>
             <label className="space-y-1">
               <span className="text-xs font-bold text-gray-500">Fecha</span>
@@ -542,7 +564,7 @@ export default function EppInspectionsPage() {
               </div>
             ) : (
               <div className="rounded-md border border-dashed border-[#DCDCDC] p-8 text-center text-gray-500">
-                Selecciona un trabajador con EPP activos.
+                Selecciona un trabajador con EPP activos para inspeccionarlos.
               </div>
             )}
           </Panel>
@@ -552,7 +574,7 @@ export default function EppInspectionsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-black uppercase tracking-widest text-[#FFB26B]">Resumen</p>
-                  <h2 className="mt-2 text-lg font-bold">{selectedWorker.fullName}</h2>
+                  <h2 className="mt-2 text-lg font-bold">{selectedWorker?.full_name || 'Sin trabajador'}</h2>
                 </div>
                 <BadgeCheck className="h-8 w-8 text-[#FF7F11]" />
               </div>
@@ -615,7 +637,7 @@ export default function EppInspectionsPage() {
 
       <SignatureDialog
         open={Boolean(signatureTarget)}
-        title={signatureTarget === 'worker' ? `Firma del trabajador: ${selectedWorker.fullName}` : `Firma responsable: ${inspectedBy}`}
+        title={signatureTarget === 'worker' ? `Firma del trabajador: ${selectedWorker?.full_name}` : `Firma inspector: ${inspectedBy}`}
         onClose={() => setSignatureTarget(null)}
         onSave={saveSignature}
       />
