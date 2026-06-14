@@ -17,8 +17,8 @@ function getAdminClient() {
       if (match) {
         serviceKey = match[1].trim();
       }
-    } catch (e) {
-      // ignorar
+    } catch (e: any) {
+      throw new Error(`Fallback error: ${e.message}. CWD: ${process.cwd()}`);
     }
   }
 
