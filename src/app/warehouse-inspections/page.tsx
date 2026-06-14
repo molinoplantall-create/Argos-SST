@@ -112,7 +112,7 @@ export default function WarehouseInspectionsPage() {
   const [objective, setObjective] = useState('Verificar el cumplimiento de estandares SSOMA, orden, limpieza y control operacional en almacenes.');
   const [inspectorName, setInspectorName] = useState('Luis Campos');
   const [items, setItems] = useState<WarehouseItem[]>(initialItems);
-  const [selectedItemId, setSelectedItemId] = useState(initialItems[0].id);
+  const [selectedItemId, setSelectedItemId] = useState(initialItems[0]?.id ?? '');
   const [signatureTarget, setSignatureTarget] = useState<SignatureTarget>(null);
   const [inspectorSignatureUrl, setInspectorSignatureUrl] = useState('');
   const [responsibleSignatureUrl, setResponsibleSignatureUrl] = useState('');
