@@ -52,41 +52,7 @@ const inspectionTypes: { value: InspectionType; label: string }[] = [
 
 const areaTypes = ['Almacenes', 'Molino', 'Maestranza', 'Quemador', 'Chancado', 'Mantenimiento', 'Operaciones', 'Otro'];
 
-const initialItems: WarehouseItem[] = [
-  {
-    id: 'warehouse-item-001',
-    zone: 'Almacen de herramientas y del personal',
-    causeType: 'CI',
-    riskLevel: 'B',
-    observation: 'Falta aplicar orden y limpieza 5S en estanterias.',
-    correctiveAction: 'Ordenar herramientas, retirar materiales innecesarios y rotular estantes.',
-    responsible: 'Responsable de almacen',
-    dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
-    status: 'PENDIENTE',
-  },
-  {
-    id: 'warehouse-item-002',
-    zone: 'Almacen de mineral',
-    causeType: 'NA',
-    riskLevel: 'C',
-    observation: 'Area limpia y accesos despejados.',
-    correctiveAction: 'Mantener condicion observada.',
-    responsible: 'Supervisor de operaciones',
-    dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
-    status: 'CERRADO',
-  },
-  {
-    id: 'warehouse-item-003',
-    zone: 'Almacen de lubricantes',
-    causeType: 'CI',
-    riskLevel: 'A',
-    observation: 'Bandeja de contencion con residuos de aceite.',
-    correctiveAction: 'Limpiar bandeja, disponer residuo y verificar kit antiderrame.',
-    responsible: 'Jefe de mantenimiento',
-    dueDate: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
-    status: 'EN_PROCESO',
-  },
-];
+const initialItems: WarehouseItem[] = [];
 
 const Panel = ({ children, className }: { children: React.ReactNode; className?: string }) => (
   <section className={cn('rounded-lg border border-[#DCDCDC] bg-white p-5 shadow-sm', className)}>
