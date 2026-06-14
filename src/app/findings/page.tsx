@@ -25,9 +25,11 @@ interface Finding {
   deadline: string | null;
   created_at: string;
   // Relaciones
-  areas?: { name: string };
   responsible?: { full_name: string };
-  inspection?: { inspection_date: string };
+  inspection?: { 
+    inspection_date: string;
+    areas?: { name: string };
+  };
   client_id: string;
 }
 
