@@ -141,13 +141,13 @@ function FindingDrawer({
 
           {/* Meta info */}
           <div className="grid grid-cols-2 gap-3">
-            {finding.areas?.name && (
+            {finding.inspection?.areas?.name && (
               <div className="bg-[#F3F2EC] rounded-xl p-3">
                 <div className="flex items-center gap-1.5 text-gray-500 mb-1">
                   <Building2 className="w-3.5 h-3.5" />
                   <span className="text-[10px] font-black uppercase">Área</span>
                 </div>
-                <p className="text-sm font-bold text-[#134686]">{finding.areas.name}</p>
+                <p className="text-sm font-bold text-[#134686]">{finding.inspection.areas.name}</p>
               </div>
             )}
             {finding.deadline && (
@@ -234,9 +234,8 @@ export default function FindingsPage() {
       .select(`
         id, observation, severity, status, finding_type,
         root_cause, deadline, created_at, client_id,
-        areas(name),
         responsible:profiles!findings_responsible_id_fkey(full_name),
-        inspection:inspections(inspection_date)
+        inspection:inspections(inspection_date, areas(name))
       `)
       .order('created_at', { ascending: false });
 
@@ -269,7 +268,7 @@ export default function FindingsPage() {
   const filtered = findings.filter((f) => {
     const matchSearch = !search ||
       f.observation.toLowerCase().includes(search.toLowerCase()) ||
-      (f.areas?.name ?? '').toLowerCase().includes(search.toLowerCase());
+      (f.inspection?.areas?.name ?? '').toLowerCase().includes(search.toLowerCase());
     const matchStatus = filterStatus === 'TODOS' || f.status === filterStatus;
     const matchSeverity = filterSeverity === 'TODOS' || f.severity === filterSeverity;
     return matchSearch && matchStatus && matchSeverity;
@@ -431,9 +430,9 @@ export default function FindingsPage() {
                       </div>
                       <div className="flex items-center gap-3 flex-wrap">
                         <StatusBadge status={finding.status} onClick={() => setSelectedFinding(finding)} />
-                        {finding.areas?.name && (
+                        {finding.inspection?.areas?.name && (
                           <span className="text-xs text-gray-500 flex items-center gap-1">
-                            <Building2 className="w-3 h-3" />{finding.areas.name}
+                            <Building2 className="w-3 h-3" />{finding.inspection.areas.name}
                           </span>
                         )}
                         {finding.deadline && (
@@ -449,7 +448,7 @@ export default function FindingsPage() {
                     <div className="hidden md:grid grid-cols-[1fr_2fr_1fr_1fr_1fr_auto] gap-4 items-center">
                       <SeverityBadge severity={finding.severity} />
                       <p className="text-sm font-medium text-[#1a1a1a] line-clamp-2">{finding.observation}</p>
-                      <span className="text-sm text-gray-500">{finding.areas?.name ?? '—'}</span>
+                      <span className="text-sm text-gray-500">{finding.inspection?.areas?.name ?? '—'}</span>
                       <span className="text-sm text-gray-500">
                         {finding.deadline
                           ? new Date(finding.deadline).toLocaleDateString('es-PE')
