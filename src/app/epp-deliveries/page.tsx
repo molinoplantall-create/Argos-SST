@@ -217,23 +217,23 @@ export default function EppDeliveriesPage() {
         signed_at: item.signedAt || null
       }));
 
-      await supabase.from('epp_delivery_items').insert(deliveryItems);
+      const { data: insertedItems } = await supabase.from('epp_delivery_items').insert(deliveryItems).select();
 
-      if (status === 'FIRMADO') {
-        const assignments = items.map(item => ({
-          client_id: profile!.client_id,
-          worker_id: selectedWorker.id,
-          epp_id: item.id,
-          delivery_id: delivery.id,
-          epp_name: item.name,
-          body_zone: item.body_zone,
-          size: item.size || null,
-          certification: item.certification || null,
-          assigned_date: deliveryDate,
-          status: 'ACTIVO'
-        }));
-        await supabase.from('worker_epp_assignments').insert(assignments);
-      }
+      // Siempre crear asignaciones de EPP al trabajador (independiente del estado de firma)
+      const assignments = items.map((item, idx) => ({
+        client_id: profile!.client_id,
+        worker_id: selectedWorker.id,
+        epp_id: item.id,
+        delivery_id: delivery.id,
+        delivery_item_id: insertedItems?.[idx]?.id || null,
+        epp_name: item.name,
+        body_zone: item.body_zone,
+        size: item.size || null,
+        certification: item.certification || null,
+        assigned_date: deliveryDate,
+        status: 'ACTIVO'
+      }));
+      await supabase.from('worker_epp_assignments').insert(assignments);
 
       showToast(`Entrega guardada exitosamente como ${status}`, 'success');
       
@@ -583,13 +583,13 @@ export default function EppDeliveriesPage() {
           </div>
 
           <div className="space-y-4">
-            <Panel className="bg-[#134686] text-white">
-              <div className="flex items-center justify-between">
-                <div>
+            <Panel className="overflow-hidden bg-[#134686] text-white">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0 flex-1">
                   <p className="text-xs font-black uppercase tracking-widest text-[#FFB26B]">Resumen</p>
-                  <h2 className="mt-2 text-xl font-bold">{selectedWorker?.full_name || 'Sin trabajador'}</h2>
+                  <h2 className="mt-2 truncate text-xl font-bold">{selectedWorker?.full_name || 'Sin trabajador'}</h2>
                 </div>
-                <PackageCheck className="h-8 w-8 text-[#FF7F11]" />
+                <PackageCheck className="h-8 w-8 flex-shrink-0 text-[#FF7F11]" />
               </div>
 
               <div className="mt-5 grid grid-cols-2 gap-3">
@@ -605,9 +605,9 @@ export default function EppDeliveriesPage() {
                   <p className="text-xs text-gray-300">Firmas EPP</p>
                   <p className="mt-1 text-2xl font-black">{signedItems}/{items.length}</p>
                 </div>
-                <div className="rounded-md border border-white/10 bg-white/5 p-3">
+                <div className="rounded-md border border-white/10 bg-white/5 p-3 overflow-hidden">
                   <p className="text-xs text-gray-300">Responsable</p>
-                  <p className="mt-1 text-lg font-black">{responsibleSignatureUrl ? 'Firmado' : 'Pendiente'}</p>
+                  <p className="mt-1 truncate text-lg font-black">{responsibleSignatureUrl ? 'Firmado' : 'Pendiente'}</p>
                 </div>
               </div>
 
