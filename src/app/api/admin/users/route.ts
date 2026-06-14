@@ -42,10 +42,14 @@ async function verifyAdminAccess(): Promise<{ allowed: boolean; reason?: string 
       .from('profiles')
       .select('roles(name), role_id')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
 
     if (error) {
-      return { allowed: false, reason: `Error fetching profile role: ${error.message}` };
+      return { allowed: false, reason: `DB Error: ${error.message}` };
+    }
+    
+    if (!profile) {
+      return { allowed: false, reason: `No se encontró perfil para el usuario (${user.id}). Asegúrate de que tu usuario tenga un registro en la tabla 'profiles'.` };
     }
 
     const roleName = (profile?.roles as any)?.name;
