@@ -217,7 +217,9 @@ export default function EppDeliveriesPage() {
         signed_at: item.signedAt || null
       }));
 
-      const { data: insertedItems } = await supabase.from('epp_delivery_items').insert(deliveryItems).select();
+      const { data: insertedItems, error: itemsError } = await supabase.from('epp_delivery_items').insert(deliveryItems).select();
+
+      if (itemsError) throw itemsError;
 
       // Siempre crear asignaciones de EPP al trabajador (independiente del estado de firma)
       const assignments = items.map((item, idx) => ({
@@ -233,7 +235,8 @@ export default function EppDeliveriesPage() {
         assigned_date: deliveryDate,
         status: 'ACTIVO'
       }));
-      await supabase.from('worker_epp_assignments').insert(assignments);
+      const { error: assignmentsError } = await supabase.from('worker_epp_assignments').insert(assignments);
+      if (assignmentsError) throw assignmentsError;
 
       showToast(`Entrega guardada exitosamente como ${status}`, 'success');
       
@@ -607,7 +610,7 @@ export default function EppDeliveriesPage() {
                 </div>
                 <div className="rounded-md border border-white/10 bg-white/5 p-3 overflow-hidden">
                   <p className="text-xs text-gray-300">Responsable</p>
-                  <p className="mt-1 truncate text-lg font-black">{responsibleSignatureUrl ? 'Firmado' : 'Pendiente'}</p>
+                  <p className="mt-1 truncate text-base font-black">{responsibleSignatureUrl ? 'Firmado' : 'Pendiente'}</p>
                 </div>
               </div>
 

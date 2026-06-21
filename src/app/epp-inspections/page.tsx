@@ -134,30 +134,50 @@ export default function EppInspectionsPage() {
     setResponsibleSignatureUrl('');
     setDeactivationReason('');
 
-    const { data: assignments } = await supabase
-      .from('worker_epp_assignments')
-      .select('*')
-      .eq('worker_id', worker.id)
-      .eq('status', 'ACTIVO')
-      .order('assigned_date', { ascending: false });
+    try {
+      let { data: assignments, error } = await supabase
+        .from('worker_epp_assignments')
+        .select('*')
+        .eq('worker_id', worker.id)
+        .eq('status', 'ACTIVO')
+        .order('assigned_date', { ascending: false });
 
-    if (assignments && assignments.length > 0) {
-      const loadedItems: InspectionItem[] = assignments.map((a: any) => ({
-        id: a.id,
-        name: a.epp_name,
-        size: a.size || undefined,
-        certification: a.certification || undefined,
-        assignedDate: a.assigned_date,
-        status: 'ACTIVO',
-        condition: 'BUENO',
-        cleaningOk: true,
-        useOk: true,
-        observation: '',
-        recommendation: '',
-      }));
-      setItems(loadedItems);
-      setSelectedItemId(loadedItems[0].id);
-    } else {
+      if (error) throw error;
+
+      if (!assignments || assignments.length === 0) {
+        // Fallback: cargar desde epp_delivery_items si worker_epp_assignments está vacío
+        const { data: legacy } = await supabase
+          .from('epp_delivery_items')
+          .select('id, epp_name, size, certification, epp_deliveries!inner(worker_id, delivery_date)')
+          .eq('epp_deliveries.worker_id', worker.id);
+
+        assignments = legacy;
+      }
+
+      if (assignments && assignments.length > 0) {
+        const loadedItems: InspectionItem[] = assignments.map((a: any) => ({
+          id: a.id,
+          name: a.epp_name,
+          size: a.size || undefined,
+          certification: a.certification || undefined,
+          assignedDate: a.assigned_date || a.epp_deliveries?.delivery_date || inspectionDate,
+          status: 'ACTIVO',
+          condition: 'BUENO',
+          cleaningOk: true,
+          useOk: true,
+          observation: '',
+          recommendation: '',
+        }));
+        setItems(loadedItems);
+        setSelectedItemId(loadedItems[0].id);
+      } else {
+        setItems([]);
+        setSelectedItemId('');
+        showToast('No se encontraron EPP activos para este trabajador.', 'info');
+      }
+    } catch (err: any) {
+      console.error(err);
+      showToast('Error al cargar EPPs del trabajador.', 'error');
       setItems([]);
       setSelectedItemId('');
     }
