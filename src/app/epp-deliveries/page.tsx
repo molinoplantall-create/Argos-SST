@@ -8,6 +8,9 @@ import { useFeedback } from '@/components/common/FeedbackUI';
 import {
   BadgeCheck,
   Calendar,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   FileDown,
   FileSignature,
   HardHat,
@@ -37,6 +40,16 @@ type Worker = {
   document_number: string;
   position: string;
   area: string;
+};
+
+type WorkerAssignment = {
+  id: string;
+  epp_name: string;
+  body_zone?: string;
+  size?: string;
+  certification?: string;
+  assigned_date: string;
+  status: string;
 };
 
 type DeliveryItem = CatalogItem & {
@@ -82,6 +95,9 @@ export default function EppDeliveriesPage() {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [saving, setSaving] = useState(false);
   const [items, setItems] = useState<DeliveryItem[]>([]);
+  const [workerCurrentEpps, setWorkerCurrentEpps] = useState<WorkerAssignment[]>([]);
+  const [showCurrentEpps, setShowCurrentEpps] = useState(true);
+  const [loadingCurrentEpps, setLoadingCurrentEpps] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -124,7 +140,7 @@ export default function EppDeliveriesPage() {
     `${item.name} ${item.body_zone} ${item.certification ?? ''}`.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  function selectWorker(workerId: string) {
+  async function selectWorker(workerId: string) {
     const worker = workers.find((w) => w.id === workerId);
     if (!worker) return;
     setSelectedWorkerId(worker.id);
@@ -132,6 +148,53 @@ export default function EppDeliveriesPage() {
     setItems([]);
     setResponsibleSignatureUrl('');
     setSignatureTarget(null);
+    setWorkerCurrentEpps([]);
+    setShowCurrentEpps(true);
+
+    // Cargar EPPs actuales del trabajador
+    setLoadingCurrentEpps(true);
+    try {
+      let { data: assignments } = await supabase
+        .from('worker_epp_assignments')
+        .select('id, epp_name, body_zone, size, certification, assigned_date, status')
+        .eq('worker_id', worker.id)
+        .eq('status', 'ACTIVO')
+        .order('assigned_date', { ascending: false });
+
+      if (!assignments || assignments.length === 0) {
+        // Fallback: cargar desde epp_delivery_items
+        const { data: legacy } = await supabase
+          .from('epp_delivery_items')
+          .select('id, epp_name, body_zone, size, certification, epp_deliveries!inner(worker_id, delivery_date)')
+          .eq('epp_deliveries.worker_id', worker.id);
+        
+        if (legacy) {
+          assignments = legacy.map((a: any) => ({
+            id: a.id,
+            epp_name: a.epp_name,
+            body_zone: a.body_zone,
+            size: a.size,
+            certification: a.certification,
+            assigned_date: a.epp_deliveries?.delivery_date || new Date().toISOString().slice(0, 10),
+            status: 'ACTIVO'
+          })).sort((a, b) => b.assigned_date.localeCompare(a.assigned_date));
+        }
+      }
+
+      if (assignments) {
+        const uniqueAssignments = [];
+        const seenNames = new Set();
+        for (const a of assignments) {
+          if (!seenNames.has(a.epp_name)) {
+            seenNames.add(a.epp_name);
+            uniqueAssignments.push(a);
+          }
+        }
+        setWorkerCurrentEpps(uniqueAssignments);
+      }
+    } finally {
+      setLoadingCurrentEpps(false);
+    }
   }
 
   function addItem() {
@@ -440,6 +503,70 @@ export default function EppDeliveriesPage() {
                 </div>
               </div>
             </Panel>
+
+            {/* Panel: EPP actuales del trabajador */}
+            {selectedWorkerId && (
+              <Panel>
+                <button
+                  type="button"
+                  onClick={() => setShowCurrentEpps((v) => !v)}
+                  className="flex w-full items-center justify-between gap-2"
+                >
+                  <h2 className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-[#111827]">
+                    <CheckCircle2 className="h-4 w-4 text-[#1E93AB]" />
+                    EPP actuales del trabajador
+                    {loadingCurrentEpps ? (
+                      <Loader2 className="h-3 w-3 animate-spin text-gray-400" />
+                    ) : (
+                      <span className={cn(
+                        'ml-1 rounded-full px-2 py-0.5 text-xs font-black',
+                        workerCurrentEpps.length > 0
+                          ? 'bg-[#1E93AB]/10 text-[#1E93AB]'
+                          : 'bg-gray-100 text-gray-500'
+                      )}>
+                        {workerCurrentEpps.length} activos
+                      </span>
+                    )}
+                  </h2>
+                  {showCurrentEpps
+                    ? <ChevronUp className="h-4 w-4 flex-shrink-0 text-gray-400" />
+                    : <ChevronDown className="h-4 w-4 flex-shrink-0 text-gray-400" />
+                  }
+                </button>
+
+                {showCurrentEpps && (
+                  <div className="mt-4">
+                    {loadingCurrentEpps ? (
+                      <div className="flex items-center gap-2 text-sm text-gray-400">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Cargando EPPs del trabajador...
+                      </div>
+                    ) : workerCurrentEpps.length === 0 ? (
+                      <p className="italic text-sm text-gray-400">
+                        Este trabajador no tiene EPPs asignados actualmente.
+                      </p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {workerCurrentEpps.map((epp) => (
+                          <div
+                            key={epp.id}
+                            className="flex items-center gap-2 rounded-md border border-[#DCDCDC] bg-[#F3F2EC] px-3 py-2 text-sm"
+                          >
+                            <HardHat className="h-4 w-4 flex-shrink-0 text-[#1E93AB]" />
+                            <div>
+                              <p className="font-bold text-[#134686] leading-tight">{epp.epp_name}</p>
+                              <p className="text-xs text-gray-500 leading-tight">
+                                {[epp.body_zone, epp.size ? `Talla ${epp.size}` : null, epp.certification].filter(Boolean).join(' · ')}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </Panel>
+            )}
 
             <Panel>
               <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">

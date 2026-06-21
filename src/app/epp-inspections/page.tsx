@@ -151,11 +151,28 @@ export default function EppInspectionsPage() {
           .select('id, epp_name, size, certification, epp_deliveries!inner(worker_id, delivery_date)')
           .eq('epp_deliveries.worker_id', worker.id);
 
-        assignments = legacy;
+        if (legacy) {
+          assignments = legacy.sort((a: any, b: any) => {
+            const dateA = a.epp_deliveries?.delivery_date || '';
+            const dateB = b.epp_deliveries?.delivery_date || '';
+            return dateB.localeCompare(dateA);
+          });
+        } else {
+          assignments = [];
+        }
       }
 
       if (assignments && assignments.length > 0) {
-        const loadedItems: InspectionItem[] = assignments.map((a: any) => ({
+        const uniqueAssignments = [];
+        const seenNames = new Set();
+        for (const a of assignments) {
+          if (!seenNames.has(a.epp_name)) {
+            seenNames.add(a.epp_name);
+            uniqueAssignments.push(a);
+          }
+        }
+
+        const loadedItems: InspectionItem[] = uniqueAssignments.map((a: any) => ({
           id: a.id,
           name: a.epp_name,
           size: a.size || undefined,
