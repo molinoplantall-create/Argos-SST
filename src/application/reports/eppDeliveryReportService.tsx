@@ -16,6 +16,8 @@ export type EppDeliveryReportItem = {
   unit?: string;
   size?: string;
   certification?: string;
+  unitPrice?: number;
+  currency?: string;
   observation?: string;
   workerSignatureUrl?: string;
 };
@@ -156,6 +158,15 @@ function SignatureCell({ src }: { src?: string }) {
   );
 }
 
+const moneyFormatter = new Intl.NumberFormat('es-PE', {
+  style: 'currency',
+  currency: 'PEN',
+});
+
+function formatMoney(value?: number) {
+  return moneyFormatter.format(Number(value ?? 0));
+}
+
 function EppDeliveryPDF({ data }: { data: EppDeliveryReportData }) {
   return (
     <Document>
@@ -235,26 +246,28 @@ function EppDeliveryPDF({ data }: { data: EppDeliveryReportData }) {
 
           <View style={styles.row}>
             <Text style={[styles.cell, styles.headerFill, { width: '4%' }]}>Item</Text>
-            <Text style={[styles.cell, styles.headerFill, { width: '27%' }]}>EPP entregado</Text>
+            <Text style={[styles.cell, styles.headerFill, { width: '23%' }]}>EPP entregado</Text>
             <Text style={[styles.cell, styles.headerFill, { width: '10%' }]}>Fecha</Text>
             <Text style={[styles.cell, styles.headerFill, { width: '8%' }]}>Cantidad</Text>
             <Text style={[styles.cell, styles.headerFill, { width: '8%' }]}>Talla</Text>
-            <Text style={[styles.cell, styles.headerFill, { width: '16%' }]}>Certificacion</Text>
-            <Text style={[styles.cell, styles.headerFill, { width: '15%' }]}>Observacion</Text>
+            <Text style={[styles.cell, styles.headerFill, { width: '14%' }]}>Certificacion</Text>
+            <Text style={[styles.cell, styles.headerFill, { width: '8%' }]}>Precio</Text>
+            <Text style={[styles.cell, styles.headerFill, { width: '13%' }]}>Observacion</Text>
             <Text style={[styles.cell, styles.headerFill, styles.lastCell, { width: '12%' }]}>Firma trabajador</Text>
           </View>
 
           {data.items.map((item, index) => (
             <View style={styles.row} key={`${item.name}-${index}`} wrap={false}>
               <Text style={[styles.cell, { width: '4%', textAlign: 'center' }]}>{index + 1}</Text>
-              <Text style={[styles.cell, { width: '27%' }]}>{item.name}</Text>
+              <Text style={[styles.cell, { width: '23%' }]}>{item.name}</Text>
               <Text style={[styles.cell, { width: '10%', textAlign: 'center' }]}>{item.deliveryDate ?? data.deliveryDate}</Text>
               <Text style={[styles.cell, { width: '8%', textAlign: 'center' }]}>
                 {item.quantity} {item.unit ?? ''}
               </Text>
               <Text style={[styles.cell, { width: '8%', textAlign: 'center' }]}>{item.size ?? '-'}</Text>
-              <Text style={[styles.cell, { width: '16%' }]}>{item.certification ?? '-'}</Text>
-              <Text style={[styles.cell, { width: '15%' }]}>{item.observation ?? '-'}</Text>
+              <Text style={[styles.cell, { width: '14%' }]}>{item.certification ?? '-'}</Text>
+              <Text style={[styles.cell, { width: '8%', textAlign: 'right' }]}>{formatMoney(item.unitPrice)}</Text>
+              <Text style={[styles.cell, { width: '13%' }]}>{item.observation ?? '-'}</Text>
               <SignatureCell src={item.workerSignatureUrl} />
             </View>
           ))}
