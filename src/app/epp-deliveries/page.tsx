@@ -679,87 +679,6 @@ export default function EppDeliveriesPage() {
               </div>
             </Panel>
 
-            {/* Panel: EPP actuales del trabajador */}
-            {selectedWorkerId && (
-              <Panel>
-                <button
-                  type="button"
-                  onClick={() => setShowCurrentEpps((v) => !v)}
-                  className="flex w-full items-center justify-between gap-2"
-                >
-                  <h2 className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-[#111827]">
-                    <CheckCircle2 className="h-4 w-4 text-[#1E93AB]" />
-                    EPP actuales del trabajador
-                    {loadingCurrentEpps ? (
-                      <Loader2 className="h-3 w-3 animate-spin text-gray-400" />
-                    ) : (
-                      <span className={cn(
-                        'ml-1 rounded-full px-2 py-0.5 text-xs font-black',
-                        workerCurrentEpps.length > 0
-                          ? 'bg-[#1E93AB]/10 text-[#1E93AB]'
-                          : 'bg-gray-100 text-gray-500'
-                      )}>
-                        {workerCurrentEpps.filter((epp) => epp.status === 'ACTIVO').length} activos / {workerCurrentEpps.length} total
-                      </span>
-                    )}
-                  </h2>
-                  {showCurrentEpps
-                    ? <ChevronUp className="h-4 w-4 flex-shrink-0 text-gray-400" />
-                    : <ChevronDown className="h-4 w-4 flex-shrink-0 text-gray-400" />
-                  }
-                </button>
-
-                {showCurrentEpps && (
-                  <div className="mt-4">
-                    {loadingCurrentEpps ? (
-                      <div className="flex items-center gap-2 text-sm text-gray-400">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Cargando EPPs del trabajador...
-                      </div>
-                    ) : workerCurrentEpps.length === 0 ? (
-                      <p className="italic text-sm text-gray-400">
-                        Este trabajador no tiene EPPs asignados actualmente.
-                      </p>
-                    ) : (
-                      <div className="grid grid-cols-1 gap-2">
-                        {workerCurrentEpps.map((epp) => (
-                          <div
-                            key={epp.id}
-                            className="grid grid-cols-1 gap-3 rounded-md border border-[#DCDCDC] bg-[#F3F2EC] px-3 py-2 text-sm md:grid-cols-[1fr_auto_auto_auto_auto]"
-                          >
-                            <div className="flex min-w-0 items-center gap-2">
-                              <HardHat className="h-4 w-4 flex-shrink-0 text-[#1E93AB]" />
-                              <div className="min-w-0">
-                              <p className="font-bold text-[#134686] leading-tight">{epp.epp_name}</p>
-                              <p className="text-xs text-gray-500 leading-tight">
-                                {[epp.body_zone, epp.size ? `Talla ${epp.size}` : null, epp.certification].filter(Boolean).join(' · ')}
-                              </p>
-                              </div>
-                            </div>
-                            <span className="text-xs font-bold text-gray-600">{epp.assigned_date}</span>
-                            <span className={cn('w-fit rounded-full px-2 py-1 text-xs font-black', epp.status === 'ACTIVO' ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-700')}>
-                              {epp.status}
-                            </span>
-                            <span className={cn(
-                              'w-fit rounded-full px-2 py-1 text-xs font-black',
-                              epp.current_condition === 'MALO'
-                                ? 'bg-red-100 text-red-700'
-                                : epp.current_condition === 'REGULAR'
-                                  ? 'bg-amber-100 text-amber-700'
-                                  : 'bg-[#1E93AB]/10 text-[#1E93AB]'
-                            )}>
-                              {epp.current_condition || 'BUENO'}
-                            </span>
-                            <span className="text-right text-xs font-black text-[#134686]">{formatMoney(epp.unit_price)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </Panel>
-            )}
-
             <Panel>
               <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <h2 className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-[#111827]">
@@ -915,6 +834,87 @@ export default function EppDeliveriesPage() {
                 </table>
               </div>
             </Panel>
+
+            {/* Panel: EPP actuales del trabajador */}
+            {selectedWorkerId && (
+              <Panel>
+                <button
+                  type="button"
+                  onClick={() => setShowCurrentEpps((v) => !v)}
+                  className="flex w-full items-center justify-between gap-2"
+                >
+                  <h2 className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-[#111827]">
+                    <CheckCircle2 className="h-4 w-4 text-[#1E93AB]" />
+                    EPP actuales del trabajador
+                    {loadingCurrentEpps ? (
+                      <Loader2 className="h-3 w-3 animate-spin text-gray-400" />
+                    ) : (
+                      <span className={cn(
+                        'ml-1 rounded-full px-2 py-0.5 text-xs font-black',
+                        workerCurrentEpps.length > 0
+                          ? 'bg-[#1E93AB]/10 text-[#1E93AB]'
+                          : 'bg-gray-100 text-gray-500'
+                      )}>
+                        {workerCurrentEpps.filter((epp) => epp.status === 'ACTIVO').length} activos / {workerCurrentEpps.length} total
+                      </span>
+                    )}
+                  </h2>
+                  {showCurrentEpps
+                    ? <ChevronUp className="h-4 w-4 flex-shrink-0 text-gray-400" />
+                    : <ChevronDown className="h-4 w-4 flex-shrink-0 text-gray-400" />
+                  }
+                </button>
+
+                {showCurrentEpps && (
+                  <div className="mt-4">
+                    {loadingCurrentEpps ? (
+                      <div className="flex items-center gap-2 text-sm text-gray-400">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Cargando EPPs del trabajador...
+                      </div>
+                    ) : workerCurrentEpps.length === 0 ? (
+                      <p className="italic text-sm text-gray-400">
+                        Este trabajador no tiene EPPs asignados actualmente.
+                      </p>
+                    ) : (
+                      <div className="grid grid-cols-1 gap-2">
+                        {workerCurrentEpps.map((epp) => (
+                          <div
+                            key={epp.id}
+                            className="grid grid-cols-1 gap-3 rounded-md border border-[#DCDCDC] bg-[#F3F2EC] px-3 py-2 text-sm md:grid-cols-[1fr_auto_auto_auto_auto]"
+                          >
+                            <div className="flex min-w-0 items-center gap-2">
+                              <HardHat className="h-4 w-4 flex-shrink-0 text-[#1E93AB]" />
+                              <div className="min-w-0">
+                                <p className="font-bold leading-tight text-[#134686]">{epp.epp_name}</p>
+                                <p className="text-xs leading-tight text-gray-500">
+                                  {[epp.body_zone, epp.size ? `Talla ${epp.size}` : null, epp.certification].filter(Boolean).join(' · ')}
+                                </p>
+                              </div>
+                            </div>
+                            <span className="text-xs font-bold text-gray-600">{epp.assigned_date}</span>
+                            <span className={cn('w-fit rounded-full px-2 py-1 text-xs font-black', epp.status === 'ACTIVO' ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-700')}>
+                              {epp.status}
+                            </span>
+                            <span className={cn(
+                              'w-fit rounded-full px-2 py-1 text-xs font-black',
+                              epp.current_condition === 'MALO'
+                                ? 'bg-red-100 text-red-700'
+                                : epp.current_condition === 'REGULAR'
+                                  ? 'bg-amber-100 text-amber-700'
+                                  : 'bg-[#1E93AB]/10 text-[#1E93AB]'
+                            )}>
+                              {epp.current_condition || 'BUENO'}
+                            </span>
+                            <span className="text-right text-xs font-black text-[#134686]">{formatMoney(epp.unit_price)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </Panel>
+            )}
           </div>
 
           <div className="space-y-4">
