@@ -61,11 +61,11 @@ function DesktopSidebar() {
 
   return (
     <aside className={cn(
-      "hidden md:flex flex-col bg-[#134686] text-white min-h-screen sticky top-0 shrink-0 transition-all duration-200",
+      "hidden md:flex flex-col bg-[#134686] text-white h-screen sticky top-0 shrink-0 transition-all duration-200 overflow-hidden",
       collapsed ? "w-16" : "w-64"
     )}>
       {/* Logo */}
-      <div className={cn("p-6 border-b border-white/10 flex items-center", collapsed ? "justify-center p-4" : "")}>
+      <div className={cn("p-6 border-b border-white/10 flex items-center shrink-0", collapsed ? "justify-center p-4" : "")}>
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg bg-[#FF7F11] flex items-center justify-center shrink-0">
             <ShieldCheck className="w-5 h-5 text-white" />
@@ -79,7 +79,7 @@ function DesktopSidebar() {
         </div>
       </div>
 
-      {/* Nav */}
+      {/* Nav — scrollable */}
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto overflow-x-hidden">
         {allNavItems.map((item) => {
           const isActive = pathname === item.href;
@@ -108,8 +108,8 @@ function DesktopSidebar() {
         })}
       </nav>
 
-      {/* Footer Sidebar */}
-      <div className="p-4 border-t border-white/10 flex flex-col gap-2 relative">
+      {/* Footer Sidebar — fixed at bottom, never scrolls */}
+      <div className="flex-none p-4 border-t border-white/10 flex flex-col gap-2 relative">
         {loading ? (
           <div className="animate-pulse bg-white/10 h-12 w-full rounded-xl" />
         ) : profile ? (
