@@ -7,22 +7,7 @@ function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   let serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!serviceKey) {
-    try {
-      const fs = require('fs');
-      const path = require('path');
-      const envPath = path.join(process.cwd(), '.env.local');
-      const envContent = fs.readFileSync(envPath, 'utf8');
-      const match = envContent.match(/SUPABASE_SERVICE_ROLE_KEY\s*=\s*(.*)/);
-      if (match) {
-        serviceKey = match[1].trim();
-      }
-    } catch (e: any) {
-      throw new Error(`Fallback error: ${e.message}. CWD: ${process.cwd()}`);
-    }
-  }
-
-  if (!serviceKey) throw new Error('SUPABASE_SERVICE_ROLE_KEY no configurada en .env.local');
+  if (!serviceKey) throw new Error('SUPABASE_SERVICE_ROLE_KEY no configurada en las variables de entorno.');
   
   return createClient(url, serviceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
