@@ -611,7 +611,7 @@ export default function EppDeliveriesPage() {
 
   return (
     <IndustrialLayout>
-      <div className="space-y-6">
+      <div className="space-y-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-[#1E93AB]">
@@ -659,7 +659,7 @@ export default function EppDeliveriesPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.3fr_0.7fr]">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.2fr_0.8fr]">
           <div className="space-y-4">
             <Panel>
               <div className="mb-4 flex items-center justify-between gap-3">
@@ -1082,26 +1082,26 @@ export default function EppDeliveriesPage() {
                 <PackageCheck className="h-8 w-8 flex-shrink-0 text-[#FF7F11]" />
               </div>
 
-              <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-3 min-w-0">
-                <div className="min-w-0 rounded-md border border-white/10 bg-white/5 p-3">
+              <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2 min-w-0">
+                <div className="min-w-0 rounded-md border border-white/10 bg-white/5 p-2">
                   <p className="text-xs text-gray-300">Items</p>
-                  <p className="mt-1 text-xl font-black">{items.length}</p>
+                  <p className="mt-1 text-lg font-black">{items.length}</p>
                 </div>
-                <div className="min-w-0 rounded-md border border-white/10 bg-white/5 p-3">
+                <div className="min-w-0 rounded-md border border-white/10 bg-white/5 p-2">
                   <p className="text-xs text-gray-300">Valor ref.</p>
-                  <p className="mt-1 text-xl font-black truncate">S/ {totalEstimated.toFixed(2)}</p>
+                  <p className="mt-1 text-lg font-black truncate">S/ {totalEstimated.toFixed(2)}</p>
                 </div>
-                <div className="min-w-0 rounded-md border border-white/10 bg-white/5 p-3">
+                <div className="min-w-0 rounded-md border border-white/10 bg-white/5 p-2">
                   <p className="text-xs text-gray-300">Firmas EPP</p>
-                  <p className="mt-1 text-xl font-black">{signedItems}/{items.length}</p>
+                  <p className="mt-1 text-lg font-black">{signedItems}/{items.length}</p>
                 </div>
-                <div className="min-w-0 rounded-md border border-white/10 bg-white/5 p-3 overflow-hidden">
+                <div className="min-w-0 rounded-md border border-white/10 bg-white/5 p-2 overflow-hidden">
                   <p className="text-xs text-gray-300">Responsable</p>
                   <p className="mt-1 truncate text-base font-black">{responsibleSignatureUrl ? 'Firmado' : 'Pendiente'}</p>
                 </div>
               </div>
 
-              <div className="mt-5 space-y-2 text-sm text-gray-200 min-w-0">
+              <div className="mt-3 space-y-1.5 text-sm text-gray-200 min-w-0">
                 <div className="flex justify-between gap-3 min-w-0">
                   <span className="shrink-0">Fecha</span>
                   <strong className="truncate">{deliveryDate}</strong>
@@ -1122,7 +1122,7 @@ export default function EppDeliveriesPage() {
               {recentDeliveries.length === 0 ? (
                 <p className="text-sm text-gray-500">No hay entregas registradas aún.</p>
               ) : (
-                <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
+                <div className="max-h-[280px] space-y-2 overflow-y-auto pr-1">
                   {recentDeliveries.map((delivery) => (
                     <div key={delivery.id} className="rounded-md border border-[#E5E7EB] p-3">
                       <div className="flex items-start justify-between gap-2">
