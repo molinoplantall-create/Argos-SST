@@ -273,6 +273,12 @@ export default function EppDeliveriesPage() {
     setItems((current) => current.filter((_, itemIndex) => itemIndex !== index));
   }
 
+  function updateItem(index: number, updates: Partial<DeliveryItem>) {
+    setItems((current) =>
+      current.map((item, i) => (i === index ? { ...item, ...updates } : item))
+    );
+  }
+
   function clearEditingState() {
     setEditingDeliveryId(null);
     setEditingDocumentCode('');
@@ -796,10 +802,80 @@ export default function EppDeliveriesPage() {
                             {item.certification ?? 'Pendiente'}
                           </span>
                         </td>
-                        <td className="py-3 text-center font-bold">{item.quantity}</td>
-                        <td className="py-3 text-gray-600">{item.size ?? '-'}</td>
-                        <td className="py-3 text-right font-bold text-[#134686]">{formatMoney(item.unit_price)}</td>
-                        <td className="py-3 text-gray-600">{item.observation ?? '-'}</td>
+                        <td className="py-3 text-center">
+                          <input
+                            type="number"
+                            min={1}
+                            value={item.quantity}
+                            onChange={(e) => updateItem(index, { quantity: parseInt(e.target.value) || 1 })}
+                            className="w-16 rounded border border-[#DCDCDC] px-2 py-1 text-sm outline-none focus:border-[#1E93AB]"
+                          />
+                        </td>
+                        <td className="py-3">
+                          {(() => {
+                            const availableSizes = (catalog.find(c => c.id === item.id) as any)?.available_sizes || [];
+                            return availableSizes.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {availableSizes.map((s: string) => (
+                                  <button
+                                    key={s}
+                                    type="button"
+                                    onClick={() => updateItem(index, { size: s })}
+                                    className={cn(
+                                      'rounded-md border px-2 py-1 text-xs font-bold',
+                                      item.size === s
+                                        ? 'border-[#FF7F11] bg-[#FF7F11] text-white'
+                                        : 'border-[#DCDCDC] bg-white text-gray-700 hover:border-[#1E93AB]'
+                                    )}
+                                  >
+                                    {s}
+                                  </button>
+                                ))}
+                              </div>
+                            ) : (
+                              <input
+                                type="text"
+                                placeholder="Ej: M, 42"
+                                value={item.size ?? ''}
+                                onChange={(e) => updateItem(index, { size: e.target.value })}
+                                className="w-20 rounded border border-[#DCDCDC] px-2 py-1 text-sm outline-none focus:border-[#1E93AB]"
+                              />
+                            );
+                          })()}
+                        </td>
+                        <td className="py-3">
+                          <div className="flex flex-col gap-1 items-end">
+                            <div className="flex gap-1">
+                              <select
+                                value={item.currency ?? 'PEN'}
+                                onChange={(e) => updateItem(index, { currency: e.target.value })}
+                                className="w-16 rounded border border-[#DCDCDC] px-1 py-1 text-xs outline-none focus:border-[#1E93AB]"
+                              >
+                                <option value="PEN">S/</option>
+                                <option value="USD">$</option>
+                              </select>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={item.unit_price ?? 0}
+                                onChange={(e) => updateItem(index, { unit_price: parseFloat(e.target.value) || 0 })}
+                                className="w-20 rounded border border-[#DCDCDC] px-2 py-1 text-sm outline-none text-right focus:border-[#1E93AB]"
+                              />
+                            </div>
+                            <span className="text-xs text-gray-500 font-bold">
+                              Sub: {item.currency === 'USD' ? '$' : 'S/'} {((item.unit_price ?? 0) * item.quantity).toFixed(2)}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-3">
+                          <input
+                            type="text"
+                            value={item.observation ?? ''}
+                            onChange={(e) => updateItem(index, { observation: e.target.value })}
+                            className="w-full min-w-[120px] rounded border border-[#DCDCDC] px-2 py-1 text-sm outline-none focus:border-[#1E93AB]"
+                          />
+                        </td>
                         <td className="py-3">
                           {item.workerSignatureUrl ? (
                             <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-1 text-xs font-black text-green-700">
