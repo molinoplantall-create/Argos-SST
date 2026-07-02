@@ -33,7 +33,7 @@ export function useCurrentProfile() {
           .single();
 
         if (mounted) {
-          setProfile(data as Profile);
+          setProfile(data as unknown as Profile);
         }
       } catch (err) {
         console.error('Failed to load profile', err);
