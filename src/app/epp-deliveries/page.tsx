@@ -180,27 +180,13 @@ export default function EppDeliveriesPage() {
     `${item.name} ${item.body_zone} ${item.certification ?? ''}`.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  async function selectWorker(workerId: string, fallbackWorker?: Worker) {
-    const worker = fallbackWorker ?? workers.find((w) => w.id === workerId);
-    if (!worker) return;
-    setSelectedWorkerId(worker.id);
-    setWorkerSearch(`${worker.document_number} - ${worker.full_name}`);
-    setItems([]);
-    setResponsibleSignatureUrl('');
-    setSignatureTarget(null);
-    setEditingDeliveryId(null);
-    setEditingDocumentCode('');
-    setEditingStatus('');
-    setWorkerCurrentEpps([]);
-    setShowCurrentEpps(true);
-
-    // Cargar EPPs actuales del trabajador
+  async function loadWorkerCurrentEpps(workerId: string) {
     setLoadingCurrentEpps(true);
     try {
       const { data: assignmentRows } = await supabase
         .from('worker_epp_assignments')
         .select('id, epp_name, body_zone, size, certification, assigned_date, status, current_condition, epp_delivery_items(unit_price, currency)')
-        .eq('worker_id', worker.id)
+        .eq('worker_id', workerId)
         .order('assigned_date', { ascending: false });
 
       let assignments: any[] | null = assignmentRows;
@@ -210,7 +196,7 @@ export default function EppDeliveriesPage() {
         const { data: legacy } = await supabase
           .from('epp_delivery_items')
           .select('id, epp_name, body_zone, size, certification, unit_price, currency, epp_deliveries!inner(worker_id, delivery_date, status)')
-          .eq('epp_deliveries.worker_id', worker.id);
+          .eq('epp_deliveries.worker_id', workerId);
         
         if (legacy) {
           assignments = legacy.map((a: any) => ({
@@ -246,6 +232,23 @@ export default function EppDeliveriesPage() {
     }
   }
 
+  async function selectWorker(workerId: string, fallbackWorker?: Worker) {
+    const worker = fallbackWorker ?? workers.find((w) => w.id === workerId);
+    if (!worker) return;
+    setSelectedWorkerId(worker.id);
+    setWorkerSearch(`${worker.document_number} - ${worker.full_name}`);
+    setItems([]);
+    setResponsibleSignatureUrl('');
+    setSignatureTarget(null);
+    setEditingDeliveryId(null);
+    setEditingDocumentCode('');
+    setEditingStatus('');
+    setWorkerCurrentEpps([]);
+    setShowCurrentEpps(true);
+
+    await loadWorkerCurrentEpps(worker.id);
+  }
+
   function addItem() {
     if (!selectedEpp) return;
     setItems((current) => [
@@ -276,7 +279,7 @@ export default function EppDeliveriesPage() {
     setEditingStatus('');
   }
 
-  async function editDelivery(deliveryId: string) {
+  async function loadDeliveryForEdit(deliveryId: string) {
     setSaving(true);
     try {
       const { data, error } = await supabase
@@ -314,7 +317,13 @@ export default function EppDeliveriesPage() {
       if (worker?.id) {
         const exists = workers.some((item) => item.id === worker.id);
         if (!exists) setWorkers((current) => [...current, worker as Worker]);
-        await selectWorker(worker.id, worker as Worker);
+        
+        setSelectedWorkerId(worker.id);
+        setWorkerSearch(`${worker.document_number} - ${worker.full_name}`);
+        
+        setWorkerCurrentEpps([]);
+        setShowCurrentEpps(true);
+        await loadWorkerCurrentEpps(worker.id);
       }
 
       setEditingDeliveryId(data.id);
@@ -322,6 +331,7 @@ export default function EppDeliveriesPage() {
       setEditingStatus(data.status ?? '');
       setDeliveryDate(data.delivery_date);
       setResponsibleSignatureUrl(data.delivered_by_signature_url ?? '');
+      
       setItems((data.epp_delivery_items ?? []).map((item: any) => ({
         id: item.epp_id ?? item.id,
         name: item.epp_name,
@@ -336,7 +346,9 @@ export default function EppDeliveriesPage() {
         workerSignatureUrl: item.worker_signature_url ?? undefined,
         signedAt: item.signed_at ?? undefined,
       })));
-      showToast('Entrega cargada para modificar.', 'success');
+      
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      showToast('Entrega cargada para editar. Modifica los items y guarda.', 'success');
     } catch (e: any) {
       showToast(e.message, 'error');
     } finally {
@@ -990,7 +1002,7 @@ export default function EppDeliveriesPage() {
                         <span>{delivery.delivery_date} · {delivery.epp_delivery_items?.[0]?.count ?? 0} EPP</span>
                         <button
                           type="button"
-                          onClick={() => editDelivery(delivery.id)}
+                          onClick={() => loadDeliveryForEdit(delivery.id)}
                           disabled={saving}
                           className="inline-flex items-center gap-1 rounded-md border border-[#DCDCDC] bg-white px-2 py-1 font-black text-[#134686] transition hover:border-[#1E93AB] hover:text-[#1E93AB] disabled:opacity-50"
                         >
