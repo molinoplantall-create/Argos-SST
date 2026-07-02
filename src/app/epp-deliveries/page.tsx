@@ -927,37 +927,37 @@ export default function EppDeliveriesPage() {
                 <PackageCheck className="h-8 w-8 flex-shrink-0 text-[#FF7F11]" />
               </div>
 
-              <div className="mt-5 grid grid-cols-2 gap-3">
-                <div className="rounded-md border border-white/10 bg-white/5 p-3">
+              <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-3 min-w-0">
+                <div className="min-w-0 rounded-md border border-white/10 bg-white/5 p-3">
                   <p className="text-xs text-gray-300">Items</p>
-                  <p className="mt-1 text-2xl font-black">{items.length}</p>
+                  <p className="mt-1 text-xl font-black">{items.length}</p>
                 </div>
-                <div className="rounded-md border border-white/10 bg-white/5 p-3">
+                <div className="min-w-0 rounded-md border border-white/10 bg-white/5 p-3">
                   <p className="text-xs text-gray-300">Valor ref.</p>
-                  <p className="mt-1 text-2xl font-black">S/ {totalEstimated.toFixed(2)}</p>
+                  <p className="mt-1 text-xl font-black truncate">S/ {totalEstimated.toFixed(2)}</p>
                 </div>
-                <div className="rounded-md border border-white/10 bg-white/5 p-3">
+                <div className="min-w-0 rounded-md border border-white/10 bg-white/5 p-3">
                   <p className="text-xs text-gray-300">Firmas EPP</p>
-                  <p className="mt-1 text-2xl font-black">{signedItems}/{items.length}</p>
+                  <p className="mt-1 text-xl font-black">{signedItems}/{items.length}</p>
                 </div>
-                <div className="rounded-md border border-white/10 bg-white/5 p-3 overflow-hidden">
+                <div className="min-w-0 rounded-md border border-white/10 bg-white/5 p-3 overflow-hidden">
                   <p className="text-xs text-gray-300">Responsable</p>
                   <p className="mt-1 truncate text-base font-black">{responsibleSignatureUrl ? 'Firmado' : 'Pendiente'}</p>
                 </div>
               </div>
 
-              <div className="mt-5 space-y-2 text-sm text-gray-200">
-                <div className="flex justify-between gap-3">
-                  <span>Fecha</span>
-                  <strong>{deliveryDate}</strong>
+              <div className="mt-5 space-y-2 text-sm text-gray-200 min-w-0">
+                <div className="flex justify-between gap-3 min-w-0">
+                  <span className="shrink-0">Fecha</span>
+                  <strong className="truncate">{deliveryDate}</strong>
                 </div>
-                <div className="flex justify-between gap-3">
-                  <span>Responsable</span>
-                  <strong>{deliveredBy}</strong>
+                <div className="flex justify-between gap-3 min-w-0">
+                  <span className="shrink-0">Responsable</span>
+                  <strong className="truncate">{deliveredBy}</strong>
                 </div>
-                <div className="flex justify-between gap-3">
-                  <span>Estado</span>
-                  <strong>{editingDeliveryId ? editingStatus || 'EDICION' : 'NUEVO'}</strong>
+                <div className="flex justify-between gap-3 min-w-0">
+                  <span className="shrink-0">Estado</span>
+                  <strong className="truncate">{editingDeliveryId ? editingStatus || 'EDICION' : 'NUEVO'}</strong>
                 </div>
               </div>
             </Panel>
