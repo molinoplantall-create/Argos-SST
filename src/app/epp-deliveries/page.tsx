@@ -25,6 +25,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useIsAdmin } from '@/lib/useIsAdmin';
 
 type CatalogItem = {
   id: string;
@@ -55,6 +56,7 @@ type WorkerAssignment = {
   current_condition?: string;
   unit_price?: number;
   currency?: string;
+  observation?: string;
 };
 
 type DeliveryItem = CatalogItem & {
@@ -125,6 +127,9 @@ export default function EppDeliveriesPage() {
   const [workerCurrentEpps, setWorkerCurrentEpps] = useState<WorkerAssignment[]>([]);
   const [showCurrentEpps, setShowCurrentEpps] = useState(true);
   const [loadingCurrentEpps, setLoadingCurrentEpps] = useState(false);
+  const [editingAssignment, setEditingAssignment] = useState<WorkerAssignment | null>(null);
+
+  const isAdmin = useIsAdmin();
 
   async function loadRecentDeliveries() {
     const { data } = await supabase
@@ -247,6 +252,45 @@ export default function EppDeliveriesPage() {
     setShowCurrentEpps(true);
 
     await loadWorkerCurrentEpps(worker.id);
+  }
+
+  async function confirmDeleteAssignment(assignment: WorkerAssignment) {
+    const confirmed = window.confirm(`¿Dar de baja el EPP "${assignment.epp_name}" asignado el ${assignment.assigned_date}? El registro se conservará pero cambiará su estado.`);
+    if (!confirmed) return;
+    try {
+      setLoadingCurrentEpps(true);
+      const { error } = await supabase
+        .from('worker_epp_assignments')
+        .update({ 
+          status: 'BAJA', 
+          current_condition: 'BAJA',
+          end_date: new Date().toISOString()
+        })
+        .eq('id', assignment.id);
+      if (error) throw error;
+      showToast('EPP dado de baja exitosamente.', 'success');
+      if (selectedWorkerId) await loadWorkerCurrentEpps(selectedWorkerId);
+    } catch (e: any) {
+      showToast(e.message, 'error');
+      setLoadingCurrentEpps(false);
+    }
+  }
+
+  async function saveAssignmentEdit(id: string, updates: Partial<WorkerAssignment>) {
+    try {
+      setLoadingCurrentEpps(true);
+      const { error } = await supabase
+        .from('worker_epp_assignments')
+        .update(updates)
+        .eq('id', id);
+      if (error) throw error;
+      showToast('Asignación actualizada', 'success');
+      if (selectedWorkerId) await loadWorkerCurrentEpps(selectedWorkerId);
+      setEditingAssignment(null);
+    } catch (e: any) {
+      showToast(e.message, 'error');
+      setLoadingCurrentEpps(false);
+    }
   }
 
   function addItem() {
@@ -969,7 +1013,10 @@ export default function EppDeliveriesPage() {
                         {workerCurrentEpps.map((epp) => (
                           <div
                             key={epp.id}
-                            className="grid grid-cols-1 gap-3 rounded-md border border-[#DCDCDC] bg-[#F3F2EC] px-3 py-2 text-sm md:grid-cols-[1fr_auto_auto_auto_auto]"
+                            className={cn(
+                            "grid grid-cols-1 gap-3 rounded-md border border-[#DCDCDC] bg-[#F3F2EC] px-3 py-2 text-sm",
+                            "md:grid-cols-[1fr_auto_auto_auto_auto_auto]"
+                          )}
                           >
                             <div className="flex min-w-0 items-center gap-2">
                               <HardHat className="h-4 w-4 flex-shrink-0 text-[#1E93AB]" />
@@ -995,6 +1042,26 @@ export default function EppDeliveriesPage() {
                               {epp.current_condition || 'BUENO'}
                             </span>
                             <span className="text-right text-xs font-black text-[#134686]">{formatMoney(epp.unit_price)}</span>
+                            {isAdmin && (
+                              <div className="flex gap-1 justify-end">
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingAssignment(epp)}
+                                  className="rounded-md border border-[#DCDCDC] bg-white p-1 text-[#1E93AB] hover:bg-[#1E93AB]/10"
+                                  title="Editar"
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => confirmDeleteAssignment(epp)}
+                                  className="rounded-md border border-[#DCDCDC] bg-white p-1 text-red-500 hover:bg-red-50"
+                                  title="Dar de baja"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -1095,11 +1162,71 @@ export default function EppDeliveriesPage() {
         </div>
       </div>
       <SignatureDialog
-        open={Boolean(signatureTarget)}
-        title={signatureTarget?.title ?? ''}
+        open={signatureTarget !== null}
         onClose={() => setSignatureTarget(null)}
         onSave={saveSignature}
+        title={signatureTarget?.title || ''}
       />
+      {editingAssignment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+            <h3 className="mb-4 text-lg font-bold text-[#134686]">Editar EPP asignado</h3>
+            <div className="mb-4 space-y-4">
+              <div>
+                <label className="text-xs font-bold text-gray-500">Talla</label>
+                <input
+                  type="text"
+                  className={fieldClass}
+                  value={editingAssignment.size || ''}
+                  onChange={(e) => setEditingAssignment({ ...editingAssignment, size: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500">Condición actual</label>
+                <select
+                  className={fieldClass}
+                  value={editingAssignment.current_condition || 'BUENO'}
+                  onChange={(e) => setEditingAssignment({ ...editingAssignment, current_condition: e.target.value })}
+                >
+                  <option value="BUENO">BUENO</option>
+                  <option value="REGULAR">REGULAR</option>
+                  <option value="MALO">MALO</option>
+                  <option value="BAJA">BAJA</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500">Observación</label>
+                <textarea
+                  className={fieldClass}
+                  rows={3}
+                  value={editingAssignment.observation || ''}
+                  onChange={(e) => setEditingAssignment({ ...editingAssignment, observation: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setEditingAssignment(null)}
+                className="rounded-md border border-[#DCDCDC] bg-white px-4 py-2 text-sm font-bold text-gray-600 transition hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => saveAssignmentEdit(editingAssignment.id, {
+                  size: editingAssignment.size,
+                  current_condition: editingAssignment.current_condition,
+                  observation: editingAssignment.observation
+                })}
+                className="rounded-md bg-[#134686] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#1E93AB]"
+              >
+                Guardar cambios
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </IndustrialLayout>
   );
 }
