@@ -130,9 +130,6 @@ export default function SSTDashboard() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-center gap-3 rounded-lg border border-[#FF7F11] bg-[#FF7F11] p-3 text-center text-lg font-black uppercase tracking-wide text-white shadow-sm">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm">
-          <ShieldCheck className="h-6 w-6 text-[#FF7F11]" />
-        </div>
         <span>ARGOS SST - Módulos Implementados</span>
       </div>
 
