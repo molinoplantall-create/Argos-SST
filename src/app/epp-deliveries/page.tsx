@@ -722,7 +722,7 @@ export default function EppDeliveriesPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.2fr_0.8fr]">
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1.2fr_0.8fr]">
           <div className="space-y-3">
             <Panel>
               <div className="mb-2 flex items-center justify-between gap-3">
@@ -821,7 +821,7 @@ export default function EppDeliveriesPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.3fr_0.35fr_0.35fr_0.55fr_0.9fr_1fr_auto]">
+              <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1.3fr_0.35fr_0.35fr_0.55fr_0.9fr_1fr_auto]">
                 <label className="space-y-1">
                   <span className="text-xs font-bold text-gray-500">EPP</span>
                   <select className={fieldClass} value={selectedEppId} onChange={(event) => setSelectedEppId(event.target.value)}>
@@ -884,7 +884,7 @@ export default function EppDeliveriesPage() {
               </div>
 
               <div className="mt-3 overflow-x-auto">
-                <table className="w-full min-w-[1060px] text-left text-sm">
+                <table className="w-full min-w-[780px] text-left text-sm">
                   <thead>
                     <tr className="border-b border-[#DCDCDC] text-xs uppercase tracking-widest text-gray-500">
                       <th className="pb-3">EPP</th>
@@ -1161,7 +1161,7 @@ export default function EppDeliveriesPage() {
           </div>
 
           <div className="space-y-3">
-            <Panel className="overflow-hidden bg-[#134686] text-white">
+            <Panel className="bg-[#134686] text-white">
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-black uppercase tracking-widest text-[#FFB26B]">Resumen</p>
