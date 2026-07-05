@@ -11,7 +11,7 @@ import {
   AlertCircle, RefreshCw, Plus, Trash2, KeyRound,
   Shield, User, Mail, CheckCircle2, XCircle,
   ChevronDown, Eye, EyeOff, Loader2, X, Building2,
-  HardHat, UserRound, Package, Upload
+  HardHat, UserRound, Package, Upload, Pencil, Save
 } from 'lucide-react';
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
@@ -20,6 +20,7 @@ interface UserRecord {
   email: string;
   fullName: string;
   role: string;
+  roleId?: string | null;
   roleDescription: string;
   position: string;
   area: string;
@@ -352,6 +353,21 @@ function UsersTab() {
     }
   };
 
+  const handleRoleChange = async (user: UserRecord, roleId: string) => {
+    const res = await fetch('/api/admin/users', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: user.id, roleId: roleId || null }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      showToast(json.error || 'No se pudo cambiar el perfil.', 'error');
+      return;
+    }
+    showToast(`Perfil de ${user.fullName} actualizado.`, 'success');
+    loadUsers();
+  };
+
   const ROLE_COLOR: Record<string, string> = {
     SUPERADMIN: 'bg-purple-100 text-purple-800',
     ADMIN_SST: 'bg-blue-100 text-blue-800',
@@ -413,7 +429,19 @@ function UsersTab() {
               </div>
 
               {/* Indicadores */}
-              <div className="flex items-center gap-2 text-xs">
+              <div className="flex flex-col gap-2 text-xs sm:w-56">
+                <select
+                  value={user.roleId ?? ''}
+                  onChange={(event) => handleRoleChange(user, event.target.value)}
+                  className="input-std py-2 text-xs font-bold"
+                  title="Cambiar perfil"
+                >
+                  <option value="">Sin rol asignado</option>
+                  {roles.map((role) => (
+                    <option key={role.id} value={role.id}>{role.name}</option>
+                  ))}
+                </select>
+                <div className="flex items-center gap-2">
                 <span aria-label={user.emailConfirmed ? 'Email confirmado' : 'Email no confirmado'}>
                   {user.emailConfirmed
                     ? <CheckCircle2 className="w-4 h-4 text-green-500" />
@@ -425,6 +453,7 @@ function UsersTab() {
                     Último: {new Date(user.lastSignIn).toLocaleDateString('es-PE')}
                   </span>
                 )}
+                </div>
               </div>
 
               {/* Acciones */}
@@ -473,6 +502,7 @@ function AreasTab() {
   const [seeding, setSeeding] = useState(false);
   const [newArea, setNewArea] = useState('');
   const [adding, setAdding] = useState(false);
+  const [editingArea, setEditingArea] = useState<any | null>(null);
 
   const loadAreas = async () => {
     setLoading(true);
@@ -512,6 +542,24 @@ function AreasTab() {
     else { showToast('Área agregada.', 'success'); setNewArea(''); loadAreas(); }
   };
 
+  const handleSaveArea = async () => {
+    if (!editingArea?.name?.trim()) return;
+    const { error } = await supabase
+      .from('areas')
+      .update({
+        name: editingArea.name.trim().toUpperCase(),
+        description: editingArea.description?.trim() || null,
+      })
+      .eq('id', editingArea.id);
+    if (error) {
+      showToast('Error al actualizar área.', 'error');
+      return;
+    }
+    showToast('Área actualizada.', 'success');
+    setEditingArea(null);
+    loadAreas();
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -547,14 +595,43 @@ function AreasTab() {
       ) : (
         <div className="space-y-2">
           {areas.map((area) => (
-            <div key={area.id} className="flex items-center justify-between bg-white border border-[#DCDCDC] rounded-xl px-4 py-3 hover:border-[#FF7F11]/50 transition-colors">
-              <div>
-                <p className="font-black text-[#1a1a1a] text-sm">{area.name}</p>
-                {area.description && <p className="text-xs text-gray-500">{area.description}</p>}
-              </div>
-              <span className="text-xs bg-[#F3F2EC] px-2.5 py-1 rounded-full font-bold text-gray-600">
-                {area.subareas?.[0]?.count ?? 0} subáreas
-              </span>
+            <div key={area.id} className="bg-white border border-[#DCDCDC] rounded-xl px-4 py-3 hover:border-[#FF7F11]/50 transition-colors">
+              {editingArea?.id === area.id ? (
+                <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_1.4fr_auto] md:items-center">
+                  <input
+                    value={editingArea.name ?? ''}
+                    onChange={(event) => setEditingArea({ ...editingArea, name: event.target.value.toUpperCase() })}
+                    className="input-std uppercase"
+                  />
+                  <input
+                    value={editingArea.description ?? ''}
+                    onChange={(event) => setEditingArea({ ...editingArea, description: event.target.value })}
+                    placeholder="Descripción"
+                    className="input-std"
+                  />
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => setEditingArea(null)} className="px-3 py-2 rounded-lg border border-[#DCDCDC] text-xs font-bold">Cancelar</button>
+                    <button type="button" onClick={handleSaveArea} className="inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-[#1E93AB] text-white text-xs font-bold">
+                      <Save className="w-3 h-3" /> Guardar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-black text-[#1a1a1a] text-sm">{area.name}</p>
+                    {area.description && <p className="text-xs text-gray-500">{area.description}</p>}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs bg-[#F3F2EC] px-2.5 py-1 rounded-full font-bold text-gray-600">
+                      {area.subareas?.[0]?.count ?? 0} subáreas
+                    </span>
+                    <button type="button" onClick={() => setEditingArea({ ...area })} className="p-2 text-[#1E93AB] hover:bg-[#1E93AB]/10 rounded-lg" title="Editar área">
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -570,6 +647,7 @@ function WorkersTab() {
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({ fullName: '', documentNumber: '', position: '', area: '' });
   const [adding, setAdding] = useState(false);
+  const [editingWorker, setEditingWorker] = useState<any | null>(null);
 
   const loadWorkers = async () => {
     setLoading(true);
@@ -589,10 +667,10 @@ function WorkersTab() {
     const { data: profile } = await supabase.from('profiles').select('client_id').eq('id', user!.id).single();
     
     const { error } = await supabase.from('workers').insert({
-      full_name: form.fullName.trim(),
+      full_name: form.fullName.trim().toUpperCase(),
       document_number: form.documentNumber.trim(),
-      position: form.position.trim(),
-      area: form.area.trim(),
+      position: form.position.trim().toUpperCase(),
+      area: form.area.trim().toUpperCase(),
       client_id: (profile as any)?.client_id,
     });
     setAdding(false);
@@ -618,6 +696,27 @@ function WorkersTab() {
     });
   };
 
+  const handleSaveWorker = async () => {
+    if (!editingWorker?.full_name?.trim() || !editingWorker?.document_number?.trim()) return;
+    const { error } = await supabase
+      .from('workers')
+      .update({
+        full_name: editingWorker.full_name.trim().toUpperCase(),
+        document_number: editingWorker.document_number.trim(),
+        position: editingWorker.position?.trim().toUpperCase() || null,
+        area: editingWorker.area?.trim().toUpperCase() || null,
+        status: editingWorker.status ?? 'ACTIVO',
+      })
+      .eq('id', editingWorker.id);
+    if (error) {
+      showToast('Error al actualizar trabajador.', 'error');
+      return;
+    }
+    showToast('Trabajador actualizado.', 'success');
+    setEditingWorker(null);
+    loadWorkers();
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -631,9 +730,9 @@ function WorkersTab() {
         <p className="text-sm font-bold text-[#1a1a1a]">Agregar Trabajador</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <input required type="text" placeholder="DNI / Documento" value={form.documentNumber} onChange={e => setForm({...form, documentNumber: e.target.value})} className="input-std" />
-          <input required type="text" placeholder="Nombre Completo" value={form.fullName} onChange={e => setForm({...form, fullName: e.target.value})} className="input-std" />
-          <input type="text" placeholder="Cargo" value={form.position} onChange={e => setForm({...form, position: e.target.value})} className="input-std" />
-          <input type="text" placeholder="Área" value={form.area} onChange={e => setForm({...form, area: e.target.value})} className="input-std" />
+          <input required type="text" placeholder="Nombre Completo" value={form.fullName} onChange={e => setForm({...form, fullName: e.target.value.toUpperCase()})} className="input-std uppercase" />
+          <input type="text" placeholder="Cargo" value={form.position} onChange={e => setForm({...form, position: e.target.value.toUpperCase()})} className="input-std uppercase" />
+          <input type="text" placeholder="Área" value={form.area} onChange={e => setForm({...form, area: e.target.value.toUpperCase()})} className="input-std uppercase" />
         </div>
         <button type="submit" disabled={adding} className="w-full sm:w-auto px-4 py-2.5 bg-[#1E93AB] text-white rounded-xl text-sm font-bold hover:bg-[#167082] transition-all disabled:opacity-50 flex items-center justify-center gap-2">
           {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Agregar
@@ -650,14 +749,38 @@ function WorkersTab() {
       ) : (
         <div className="space-y-2">
           {workers.map((worker) => (
-            <div key={worker.id} className="flex items-center justify-between bg-white border border-[#DCDCDC] rounded-xl px-4 py-3">
-              <div>
-                <p className="font-black text-[#1a1a1a] text-sm">{worker.full_name} <span className="text-xs text-gray-500 font-normal">({worker.document_number})</span></p>
-                <p className="text-xs text-gray-500">{worker.position} {worker.area && `- ${worker.area}`}</p>
-              </div>
-              <button onClick={() => handleDelete(worker.id, worker.full_name)} className="p-2 text-gray-400 hover:text-red-500 transition-colors">
-                <Trash2 className="w-4 h-4" />
-              </button>
+            <div key={worker.id} className="bg-white border border-[#DCDCDC] rounded-xl px-4 py-3">
+              {editingWorker?.id === worker.id ? (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-5">
+                    <input required value={editingWorker.document_number ?? ''} onChange={(event) => setEditingWorker({ ...editingWorker, document_number: event.target.value })} className="input-std" />
+                    <input required value={editingWorker.full_name ?? ''} onChange={(event) => setEditingWorker({ ...editingWorker, full_name: event.target.value.toUpperCase() })} className="input-std uppercase md:col-span-2" />
+                    <input value={editingWorker.position ?? ''} onChange={(event) => setEditingWorker({ ...editingWorker, position: event.target.value.toUpperCase() })} className="input-std uppercase" />
+                    <input value={editingWorker.area ?? ''} onChange={(event) => setEditingWorker({ ...editingWorker, area: event.target.value.toUpperCase() })} className="input-std uppercase" />
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <button type="button" onClick={() => setEditingWorker(null)} className="px-3 py-2 rounded-lg border border-[#DCDCDC] text-xs font-bold">Cancelar</button>
+                    <button type="button" onClick={handleSaveWorker} className="inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-[#1E93AB] text-white text-xs font-bold">
+                      <Save className="w-3 h-3" /> Guardar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-black text-[#1a1a1a] text-sm">{worker.full_name} <span className="text-xs text-gray-500 font-normal">({worker.document_number})</span></p>
+                    <p className="text-xs text-gray-500">{worker.position} {worker.area && `- ${worker.area}`}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => setEditingWorker({ ...worker })} className="p-2 text-[#1E93AB] hover:bg-[#1E93AB]/10 rounded-lg transition-colors" title="Editar trabajador">
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => handleDelete(worker.id, worker.full_name)} className="p-2 text-gray-400 hover:text-red-500 transition-colors" title="Eliminar trabajador">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>

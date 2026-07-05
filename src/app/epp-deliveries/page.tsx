@@ -26,7 +26,6 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsAdmin } from '@/lib/useIsAdmin';
-import { ResumenPanel, HistorialPanel, EditAssignmentModal } from './RightColumn';
 
 type CatalogItem = {
   id: string;
@@ -1178,11 +1177,11 @@ export default function EppDeliveriesPage() {
 
               <div className="mt-2 grid grid-cols-2 gap-2 min-w-0">
                 <div className="min-w-0 rounded-md border border-white/10 bg-white/5 p-2">
-                  <p className="text-xs text-gray-300">Items</p>
+                  <p className="text-xs text-gray-300">Items entrega</p>
                   <p className="mt-1 text-base font-black">{items.length}</p>
                 </div>
                 <div className="min-w-0 rounded-md border border-white/10 bg-white/5 p-2">
-                  <p className="text-xs text-gray-300">Valor ref.</p>
+                  <p className="text-xs text-gray-300">Total entrega</p>
                   <p className="mt-1 text-base font-black truncate">S/ {totalEstimated.toFixed(2)}</p>
                 </div>
                 <div className="min-w-0 rounded-md border border-white/10 bg-white/5 p-2">
@@ -1190,8 +1189,10 @@ export default function EppDeliveriesPage() {
                   <p className="mt-1 text-base font-black">{signedItems}/{items.length}</p>
                 </div>
                 <div className="min-w-0 rounded-md border border-white/10 bg-white/5 p-2 overflow-hidden">
-                  <p className="text-xs text-gray-300">Responsable</p>
-                  <p className="mt-1 truncate text-base font-black">{responsibleSignatureUrl ? 'Firmado' : 'Pendiente'}</p>
+                  <p className="text-xs text-gray-300">Total EPPs activos</p>
+                  <p className="mt-1 truncate text-base font-black">
+                    S/ {workerCurrentEpps.filter(e => e.status === 'ACTIVO').reduce((s, e) => s + (e.unit_price ?? 0), 0).toFixed(2)}
+                  </p>
                 </div>
               </div>
 

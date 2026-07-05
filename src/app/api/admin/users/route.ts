@@ -63,7 +63,7 @@ export async function GET() {
     // Traer también los perfiles para enriquecer la respuesta
     const { data: profiles } = await admin
       .from('profiles')
-      .select('id, full_name, email, is_active, roles(name, description), position, area, created_at');
+      .select('id, full_name, email, is_active, role_id, roles(name, description), position, area, created_at');
 
     const profileMap = new Map((profiles ?? []).map((p: any) => [p.id, p]));
 
@@ -74,6 +74,7 @@ export async function GET() {
         email: u.email,
         fullName: profile?.full_name ?? u.email?.split('@')[0] ?? '—',
         role: profile?.roles?.name ?? 'Sin rol',
+        roleId: profile?.role_id ?? null,
         roleDescription: profile?.roles?.description ?? '',
         position: profile?.position ?? '',
         area: profile?.area ?? '',
