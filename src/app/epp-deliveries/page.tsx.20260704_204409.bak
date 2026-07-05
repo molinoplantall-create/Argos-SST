@@ -72,9 +72,8 @@ type RecentDelivery = {
   document_code?: string;
   delivery_date: string;
   status: string;
-  delivered_by_signature_url?: string;
   workers?: { full_name?: string } | null;
-  epp_delivery_items?: { count: number; worker_signature_url?: string }[];
+  epp_delivery_items?: { count: number }[];
 };
 
 const fieldClass =
@@ -165,7 +164,7 @@ export default function EppDeliveriesPage() {
   async function loadRecentDeliveries() {
     const { data } = await supabase
       .from('epp_deliveries')
-      .select('id, document_code, delivery_date, status, delivered_by_signature_url, workers(full_name), epp_delivery_items(count, worker_signature_url)')
+      .select('id, document_code, delivery_date, status, workers(full_name), epp_delivery_items(count)')
       .order('created_at', { ascending: false })
       .limit(8);
 
@@ -183,7 +182,7 @@ export default function EppDeliveriesPage() {
       const [wRes, cRes, dRes] = await Promise.all([
         supabase.from('workers').select('*').eq('status', 'ACTIVO').order('full_name'),
         supabase.from('epp_catalog').select('*').eq('is_active', true).order('name'),
-        supabase.from('epp_deliveries').select('id, document_code, delivery_date, status, delivered_by_signature_url, workers(full_name), epp_delivery_items(count, worker_signature_url)').order('created_at', { ascending: false }).limit(8)
+        supabase.from('epp_deliveries').select('id, document_code, delivery_date, status, workers(full_name), epp_delivery_items(count)').order('created_at', { ascending: false }).limit(8)
       ]);
 
       if (wRes.data) setWorkers(wRes.data);
@@ -286,38 +285,8 @@ export default function EppDeliveriesPage() {
     await loadWorkerCurrentEpps(worker.id);
   }
 
-  async function toggleAssignmentStatus(assignment: WorkerAssignment) {
-    if (!isAdmin) return;
-
-    const isActive = assignment.status === 'ACTIVO';
-    const newStatus = isActive ? 'BAJA' : 'ACTIVO';
-
-    const { error } = await supabase
-      .from('worker_epp_assignments')
-      .update({
-        status: newStatus,
-        current_condition: isActive ? 'BAJA' : 'BUENO',
-        end_date: isActive ? new Date().toISOString() : null,
-      })
-      .eq('id', assignment.id);
-
-    if (error) {
-      showToast(error.message, 'error');
-      return;
-    }
-
-    showToast(`EPP ${assignment.epp_name} marcado como ${newStatus}`, 'success');
-
-    if (selectedWorkerId) {
-      await loadWorkerCurrentEpps(selectedWorkerId);
-    }
-  }
-
   async function confirmDeleteAssignment(assignment: WorkerAssignment) {
-    const confirmed = window.confirm(
-      `¿Eliminar el EPP "${assignment.epp_name}"?\n\n` +
-      `Se marcará como BAJA. El registro se conserva para histórico.`
-    );
+    const confirmed = window.confirm(`¿Dar de baja el EPP "${assignment.epp_name}" asignado el ${assignment.assigned_date}? El registro se conservará pero cambiará su estado.`);
     if (!confirmed) return;
     try {
       setLoadingCurrentEpps(true);
@@ -674,14 +643,14 @@ export default function EppDeliveriesPage() {
 
   return (
     <IndustrialLayout>
-      <div className="space-y-3">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="space-y-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-[#1E93AB]">
               <ShieldCheck className="h-4 w-4" />
               ARGOS SST / {deliveredBy}
             </div>
-            <h1 className="mt-1 text-xl font-bold text-[#134686]">Entrega de EPP</h1>
+            <h1 className="mt-2 text-2xl font-bold text-[#134686]">Entrega de EPP</h1>
           </div>
           <div className="flex flex-wrap gap-2">
             {editingDeliveryId && (
@@ -722,10 +691,10 @@ export default function EppDeliveriesPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="space-y-3">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="space-y-4">
             <Panel>
-              <div className="mb-2 flex items-center justify-between gap-3">
+              <div className="mb-3 flex items-center justify-between gap-3">
                 <h2 className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-[#111827]">
                   <UserRound className="h-4 w-4 text-[#1E93AB]" />
                   Datos de entrega
@@ -735,7 +704,7 @@ export default function EppDeliveriesPage() {
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <label className="space-y-1 xl:col-span-2">
                   <span className="text-xs font-bold text-gray-500">Buscar trabajador por DNI o nombre</span>
                   <div className="relative">
@@ -1072,7 +1041,7 @@ export default function EppDeliveriesPage() {
                         Este trabajador no tiene EPPs asignados actualmente.
                       </p>
                     ) : (
-                      <div className={cn('grid grid-cols-1 gap-2', !showAllCurrentEpps && workerCurrentEpps.length > 4 ? 'max-h-[300px] overflow-y-auto pr-1' : '')}>
+                      <div className="grid grid-cols-1 gap-2">
                         {workerCurrentEpps.map((epp) => (
                           <div
                             key={epp.id}
@@ -1091,25 +1060,9 @@ export default function EppDeliveriesPage() {
                               </div>
                             </div>
                             <span className="text-xs font-bold text-gray-600">{epp.assigned_date}</span>
-                            {isAdmin ? (
-                              <button
-                                type="button"
-                                onClick={() => toggleAssignmentStatus(epp)}
-                                className={cn(
-                                  'w-fit rounded-md px-2 py-1 text-[10px] font-black transition',
-                                  epp.status === 'ACTIVO'
-                                    ? 'bg-green-100 text-green-700 hover:bg-red-100 hover:text-red-700'
-                                    : 'bg-gray-100 text-gray-500 hover:bg-green-100 hover:text-green-700'
-                                )}
-                                title={epp.status === 'ACTIVO' ? 'Click para dar de baja' : 'Click para reactivar'}
-                              >
-                                {epp.status === 'ACTIVO' ? 'ACTIVO' : 'BAJA'}
-                              </button>
-                            ) : (
-                              <span className={cn('w-fit rounded-full px-2 py-1 text-xs font-black', epp.status === 'ACTIVO' ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-700')}>
-                                {epp.status === 'ACTIVO' ? 'ACTIVO' : 'BAJA'}
-                              </span>
-                            )}
+                            <span className={cn('w-fit rounded-full px-2 py-1 text-xs font-black', epp.status === 'ACTIVO' ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-700')}>
+                              {epp.status}
+                            </span>
                             <span className={cn(
                               'w-fit rounded-full px-2 py-1 text-xs font-black',
                               epp.current_condition === 'MALO'
@@ -1144,15 +1097,6 @@ export default function EppDeliveriesPage() {
                           </div>
                         ))}
                       </div>
-                    )}
-                    {!loadingCurrentEpps && workerCurrentEpps.length > 4 && (
-                      <button
-                        type="button"
-                        onClick={() => setShowAllCurrentEpps((value) => !value)}
-                        className="mt-2 text-xs font-black text-[#1E93AB] hover:text-[#134686]"
-                      >
-                        {showAllCurrentEpps ? 'Ver menos' : 'Ver todos'}
-                      </button>
                     )}
                   </div>
                 )}
@@ -1200,13 +1144,7 @@ export default function EppDeliveriesPage() {
                 </div>
                 <div className="flex justify-between gap-3 min-w-0">
                   <span className="shrink-0">Estado</span>
-                  <StatusBadge
-                      status={getDeliveryStatus({
-                        status: editingDeliveryId ? editingStatus : 'BORRADOR',
-                        delivered_by_signature_url: responsibleSignatureUrl,
-                        epp_delivery_items: items.map((item) => ({ worker_signature_url: item.workerSignatureUrl })),
-                      })}
-                    />
+                  <strong className="truncate">{editingDeliveryId ? editingStatus || 'EDICION' : 'NUEVO'}</strong>
                 </div>
               </div>
             </Panel>
@@ -1224,7 +1162,16 @@ export default function EppDeliveriesPage() {
                           <p className="text-xs font-black text-[#1E93AB]">{delivery.document_code || 'SIN COD'}</p>
                           <p className="mt-1 truncate font-bold text-[#134686]">{delivery.workers?.full_name}</p>
                         </div>
-                        <StatusBadge status={getDeliveryStatus(delivery)} />
+                        <span
+                          className={cn(
+                            'rounded-full px-2 py-1 text-[10px] font-black',
+                            delivery.status === 'FIRMADO'
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-amber-100 text-amber-700'
+                          )}
+                        >
+                          {delivery.status}
+                        </span>
                       </div>
                       <div className="mt-3 flex items-center justify-between gap-2 text-xs text-gray-500">
                         <span>{delivery.delivery_date} · {delivery.epp_delivery_items?.[0]?.count ?? 0} EPP</span>

@@ -1,0 +1,42 @@
+[
+  {
+    "content": "Revisar estado actual de archivos y git",
+    "active_form": "Revisando archivos y estado git",
+    "status": "completed"
+  },
+  {
+    "content": "5.1 ajustar sidebar y build/commit",
+    "active_form": "Ajustando sidebar y verificando build",
+    "status": "in_progress"
+  },
+  {
+    "content": "5.2 compactar epp deliveries y build/commit",
+    "active_form": "Compactando layout y verificando build",
+    "status": "pending"
+  },
+  {
+    "content": "5.3 estados visuales de entrega y build/commit",
+    "active_form": "Actualizando badges de estado y verificando build",
+    "status": "pending"
+  },
+  {
+    "content": "5.4 toggle ACTIVO/BAJA y build/commit",
+    "active_form": "Agregando toggle de asignaciones y verificando build",
+    "status": "pending"
+  },
+  {
+    "content": "5.5 editar/eliminar admin y build/commit",
+    "active_form": "Agregando acciones admin y verificando build",
+    "status": "pending"
+  },
+  {
+    "content": "5.6 excluir BAJA en inspecciones y build/commit",
+    "active_form": "Filtrando EPPs baja en inspecciones y verificando build",
+    "status": "pending"
+  },
+  {
+    "content": "Verificación final y resumen",
+    "active_form": "Ejecutando verificación final y preparando resumen",
+    "status": "pending"
+  }
+]
