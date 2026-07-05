@@ -217,6 +217,12 @@ export default function EppDeliveriesPage() {
     `${item.name} ${item.body_zone} ${item.certification ?? ''}`.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  useEffect(() => {
+    if (filteredCatalog.length > 0 && !filteredCatalog.some(item => item.id === selectedEppId)) {
+      setSelectedEppId(filteredCatalog[0].id);
+    }
+  }, [filteredCatalog, selectedEppId]);
+
   async function loadWorkerCurrentEpps(workerId: string) {
     setLoadingCurrentEpps(true);
     try {
@@ -227,29 +233,6 @@ export default function EppDeliveriesPage() {
         .order('assigned_date', { ascending: false });
 
       let assignments: any[] | null = assignmentRows;
-
-      if (!assignments || assignments.length === 0) {
-        // Fallback: cargar desde epp_delivery_items
-        const { data: legacy } = await supabase
-          .from('epp_delivery_items')
-          .select('id, epp_name, body_zone, size, certification, unit_price, currency, epp_deliveries!inner(worker_id, delivery_date, status)')
-          .eq('epp_deliveries.worker_id', workerId);
-        
-        if (legacy) {
-          assignments = legacy.map((a: any) => ({
-            id: a.id,
-            epp_name: a.epp_name,
-            body_zone: a.body_zone,
-            size: a.size,
-            certification: a.certification,
-            unit_price: Number(a.unit_price ?? 0),
-            currency: a.currency ?? 'PEN',
-            assigned_date: a.epp_deliveries?.delivery_date || new Date().toISOString().slice(0, 10),
-            status: a.epp_deliveries?.status === 'ANULADO' ? 'BAJA' : 'ACTIVO',
-            current_condition: 'BUENO'
-          })).sort((a, b) => b.assigned_date.localeCompare(a.assigned_date));
-        }
-      }
 
       if (assignments) {
         const normalized = assignments.map((assignment: any) => {
@@ -589,7 +572,6 @@ export default function EppDeliveriesPage() {
 
       if (itemsError) throw itemsError;
 
-      // Siempre crear asignaciones de EPP al trabajador (independiente del estado de firma)
       const assignments = items.map((item, idx) => ({
         client_id: profile!.client_id,
         worker_id: selectedWorker.id,
@@ -610,6 +592,7 @@ export default function EppDeliveriesPage() {
       showToast(editingDeliveryId ? `Entrega actualizada como ${status}` : `Entrega guardada exitosamente como ${status}`, 'success');
       
       await loadRecentDeliveries();
+      await loadWorkerCurrentEpps(selectedWorker.id);
 
       setItems([]);
       setResponsibleSignatureUrl('');
@@ -905,7 +888,7 @@ export default function EppDeliveriesPage() {
               </div>
 
               <div className="mt-3 overflow-x-auto">
-                <table className="w-full min-w-[780px] text-left text-sm">
+                <table className="w-full min-w-[1024px] text-left text-sm">
                   <thead>
                     <tr className="border-b border-[#DCDCDC] text-xs uppercase tracking-widest text-gray-500">
                       <th className="pb-3">EPP</th>
@@ -977,7 +960,7 @@ export default function EppDeliveriesPage() {
                               <select
                                 value={item.currency ?? 'PEN'}
                                 onChange={(e) => updateItem(index, { currency: e.target.value })}
-                                className="w-16 rounded border border-[#DCDCDC] px-1 py-1 text-xs outline-none focus:border-[#1E93AB]"
+                                className="w-12 rounded border border-[#DCDCDC] px-1 py-1 text-xs outline-none focus:border-[#1E93AB]"
                               >
                                 <option value="PEN">S/</option>
                                 <option value="USD">$</option>
@@ -1051,7 +1034,6 @@ export default function EppDeliveriesPage() {
               </div>
             </Panel>
 
-            {/* Panel: EPP actuales del trabajador */}
             {selectedWorkerId && (
               <Panel>
                 <button
@@ -1181,61 +1163,6 @@ export default function EppDeliveriesPage() {
                           </div>
                           </React.Fragment>
                         ))}
-                      </div>
-                    )}
-                    {!loadingCurrentEpps && workerCurrentEpps.length > 4 && (
-                      <button
-                        type="button"
-                        onClick={() => setShowAllCurrentEpps((value) => !value)}
-                        className="mt-2 text-xs font-black text-[#1E93AB] hover:text-[#134686]"
-                      >
-                        {showAllCurrentEpps ? 'Ver menos' : 'Ver todos'}
-                      </button>
-                    )}
-                  </div>
-                )}
-              </Panel>
-            )}
-          </div>
-
-          <div className="space-y-3">
-            <Panel className="bg-[#134686] text-white">
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-black uppercase tracking-widest text-[#FFB26B]">Resumen</p>
-                  <h2 className="mt-1 truncate text-base font-bold">{selectedWorker?.full_name || 'Sin trabajador'}</h2>
-                </div>
-                <PackageCheck className="h-7 w-7 flex-shrink-0 text-[#FF7F11]" />
-              </div>
-
-              <div className="mt-2 grid grid-cols-2 gap-2 min-w-0">
-                <div className="min-w-0 rounded-md border border-white/10 bg-white/5 p-2">
-                  <p className="text-xs text-gray-300">Items entrega</p>
-                  <p className="mt-1 text-base font-black">{items.length}</p>
-                </div>
-                <div className="min-w-0 rounded-md border border-white/10 bg-white/5 p-2">
-                  <p className="text-xs text-gray-300">Total entrega</p>
-                  <p className="mt-1 text-base font-black truncate">S/ {totalEstimated.toFixed(2)}</p>
-                </div>
-                <div className="min-w-0 rounded-md border border-white/10 bg-white/5 p-2">
-                  <p className="text-xs text-gray-300">Firmas EPP</p>
-                  <p className="mt-1 text-base font-black">{signedItems}/{items.length}</p>
-                </div>
-                <div className="min-w-0 rounded-md border border-white/10 bg-white/5 p-2 overflow-hidden">
-                  <p className="text-xs text-gray-300">Total EPPs activos</p>
-                  <p className="mt-1 truncate text-base font-black">
-                    S/ {workerCurrentEpps.filter(e => e.status === 'ACTIVO').reduce((s, e) => s + (e.unit_price ?? 0), 0).toFixed(2)}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-2 space-y-1.5 text-sm text-gray-200 min-w-0">
-                <div className="flex justify-between gap-3 min-w-0">
-                  <span className="shrink-0">Fecha</span>
-                  <strong className="truncate">{deliveryDate}</strong>
-                </div>
-                <div className="flex justify-between gap-3 min-w-0">
-                  <span className="shrink-0">Responsable</span>
                   <strong className="truncate">{deliveredBy}</strong>
                 </div>
                 <div className="flex justify-between gap-3 min-w-0">
