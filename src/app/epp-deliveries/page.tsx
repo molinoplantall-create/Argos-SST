@@ -47,6 +47,7 @@ type Worker = {
 
 type WorkerAssignment = {
   id: string;
+  epp_id?: string;
   epp_name: string;
   body_zone?: string;
   size?: string;
@@ -130,7 +131,7 @@ type SignatureTarget =
   | { type: 'responsible'; title: string };
 
 export default function EppDeliveriesPage() {
-  const { showToast } = useFeedback();
+  const { showToast, showConfirm } = useFeedback();
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
   const [recentDeliveries, setRecentDeliveries] = useState<RecentDelivery[]>([]);
@@ -212,7 +213,6 @@ export default function EppDeliveriesPage() {
     [items]
   );
   const signedItems = useMemo(() => items.filter((item) => item.workerSignatureUrl).length, [items]);
-
   const filteredCatalog = catalog.filter((item) =>
     `${item.name} ${item.body_zone} ${item.certification ?? ''}`.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -222,7 +222,7 @@ export default function EppDeliveriesPage() {
     try {
       const { data: assignmentRows } = await supabase
         .from('worker_epp_assignments')
-        .select('id, epp_name, body_zone, size, certification, assigned_date, status, current_condition, delivery_item_id, epp_delivery_items(unit_price, currency)')
+        .select('id, epp_id, epp_name, body_zone, size, certification, assigned_date, status, current_condition, delivery_item_id, epp_delivery_items(unit_price, currency)')
         .eq('worker_id', workerId)
         .order('assigned_date', { ascending: false });
 
@@ -252,17 +252,26 @@ export default function EppDeliveriesPage() {
       }
 
       if (assignments) {
-        setWorkerCurrentEpps(assignments.map((assignment: any) => ({
-          ...assignment,
-          unit_price: Number(
-            (Array.isArray(assignment.epp_delivery_items)
-              ? assignment.epp_delivery_items[0]?.unit_price
-              : assignment.epp_delivery_items?.unit_price) ?? assignment.unit_price ?? 0
-          ),
-          currency: (Array.isArray(assignment.epp_delivery_items)
-            ? assignment.epp_delivery_items[0]?.currency
-            : assignment.epp_delivery_items?.currency) ?? assignment.currency ?? 'PEN',
-        })));
+        const normalized = assignments.map((assignment: any) => {
+          const deliveredItem = Array.isArray(assignment.epp_delivery_items)
+            ? assignment.epp_delivery_items[0]
+            : assignment.epp_delivery_items;
+          const catalogItem = catalog.find((item) => item.id === assignment.epp_id || item.name === assignment.epp_name);
+          const deliveredPrice = Number(deliveredItem?.unit_price ?? assignment.unit_price ?? 0);
+          const catalogPrice = Number(catalogItem?.unit_price ?? 0);
+
+          return {
+            ...assignment,
+            unit_price: deliveredPrice > 0 ? deliveredPrice : catalogPrice,
+            currency: deliveredItem?.currency ?? catalogItem?.currency ?? assignment.currency ?? 'PEN',
+          };
+        }).sort((a, b) => {
+          if (a.status === 'ACTIVO' && b.status !== 'ACTIVO') return -1;
+          if (a.status !== 'ACTIVO' && b.status === 'ACTIVO') return 1;
+          return String(b.assigned_date ?? '').localeCompare(String(a.assigned_date ?? ''));
+        });
+
+        setWorkerCurrentEpps(normalized);
       }
     } finally {
       setLoadingCurrentEpps(false);
@@ -293,50 +302,57 @@ export default function EppDeliveriesPage() {
     const isActive = assignment.status === 'ACTIVO';
     const newStatus = isActive ? 'BAJA' : 'ACTIVO';
 
-    const { error } = await supabase
-      .from('worker_epp_assignments')
-      .update({
-        status: newStatus,
-        current_condition: isActive ? 'BAJA' : 'BUENO',
-        deactivated_at: isActive ? new Date().toISOString() : null,
-      })
-      .eq('id', assignment.id);
+    showConfirm({
+      title: isActive ? 'Dar de baja EPP' : 'Reactivar EPP',
+      message: isActive
+        ? `¿Confirmas dar de baja "${assignment.epp_name}"? El registro se conservará en historial y pasará al final de la lista.`
+        : `¿Confirmas reactivar "${assignment.epp_name}"? Volverá a mostrarse como activo.`,
+      onConfirm: async () => {
+        const { error } = await supabase
+          .from('worker_epp_assignments')
+          .update({
+            status: newStatus,
+            current_condition: isActive ? 'BAJA' : 'BUENO',
+            deactivated_at: isActive ? new Date().toISOString() : null,
+          })
+          .eq('id', assignment.id);
 
-    if (error) {
-      showToast(error.message, 'error');
-      return;
-    }
+        if (error) {
+          showToast(error.message, 'error');
+          return;
+        }
 
-    showToast(`EPP ${assignment.epp_name} marcado como ${newStatus}`, 'success');
+        showToast(`EPP ${assignment.epp_name} marcado como ${newStatus}`, 'success');
 
-    if (selectedWorkerId) {
-      await loadWorkerCurrentEpps(selectedWorkerId);
-    }
+        if (selectedWorkerId) {
+          await loadWorkerCurrentEpps(selectedWorkerId);
+        }
+      },
+    });
   }
 
   async function confirmDeleteAssignment(assignment: WorkerAssignment) {
-    const confirmed = window.confirm(
-      `¿Eliminar el EPP "${assignment.epp_name}"?\n\n` +
-      `Se marcará como BAJA. El registro se conserva para histórico.`
-    );
-    if (!confirmed) return;
-    try {
-      setLoadingCurrentEpps(true);
-      const { error } = await supabase
-        .from('worker_epp_assignments')
-        .update({ 
-          status: 'BAJA', 
-          current_condition: 'BAJA',
-          deactivated_at: new Date().toISOString()
-        })
-        .eq('id', assignment.id);
-      if (error) throw error;
-      showToast('EPP dado de baja exitosamente.', 'success');
-      if (selectedWorkerId) await loadWorkerCurrentEpps(selectedWorkerId);
-    } catch (e: any) {
-      showToast(e.message, 'error');
-      setLoadingCurrentEpps(false);
-    }
+    if (!isAdmin) return;
+
+    showConfirm({
+      title: 'Eliminar EPP asignado',
+      message: `¿Confirmas eliminar definitivamente "${assignment.epp_name}" de los EPP actuales del trabajador? Esta acción quita la asignación; no es una baja.`,
+      onConfirm: async () => {
+        try {
+          setLoadingCurrentEpps(true);
+          const { error } = await supabase
+            .from('worker_epp_assignments')
+            .delete()
+            .eq('id', assignment.id);
+          if (error) throw error;
+          showToast('EPP eliminado de la lista del trabajador.', 'success');
+          if (selectedWorkerId) await loadWorkerCurrentEpps(selectedWorkerId);
+        } catch (e: any) {
+          showToast(e.message, 'error');
+          setLoadingCurrentEpps(false);
+        }
+      },
+    });
   }
 
   async function saveAssignmentEdit(id: string, updates: Partial<WorkerAssignment>) {
@@ -1078,13 +1094,29 @@ export default function EppDeliveriesPage() {
                       </p>
                     ) : (
                       <div className={cn('grid grid-cols-1 gap-2', !showAllCurrentEpps && workerCurrentEpps.length > 4 ? 'max-h-[300px] overflow-y-auto pr-1' : '')}>
-                        {workerCurrentEpps.map((epp) => (
+                        {workerCurrentEpps.map((epp, index) => (
+                          <React.Fragment key={epp.id}>
+                            {(index === 0 || workerCurrentEpps[index - 1]?.status !== epp.status) && (
+                              <div className="flex items-center gap-2 pt-1">
+                                <span className={cn(
+                                  'rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-widest',
+                                  epp.status === 'ACTIVO' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                )}>
+                                  {epp.status === 'ACTIVO' ? 'Activos' : 'De baja'}
+                                </span>
+                                <span className="text-xs font-bold text-gray-400">
+                                  {workerCurrentEpps.filter((item) => item.status === epp.status).length}
+                                </span>
+                              </div>
+                            )}
                           <div
                             key={epp.id}
                             className={cn(
-                            "grid grid-cols-1 gap-3 rounded-md border border-[#DCDCDC] bg-[#F3F2EC] px-3 py-2 text-sm",
-                            "md:grid-cols-[1fr_auto_auto_auto_auto_auto]"
-                          )}
+                              'grid grid-cols-1 gap-3 rounded-md border px-3 py-2 text-sm md:grid-cols-[1fr_auto_auto_auto_auto_auto]',
+                              epp.status === 'ACTIVO'
+                                ? 'border-[#DCDCDC] bg-[#F3F2EC]'
+                                : 'border-red-200 bg-red-50'
+                            )}
                           >
                             <div className="flex min-w-0 items-center gap-2">
                               <HardHat className="h-4 w-4 flex-shrink-0 text-[#1E93AB]" />
@@ -1104,14 +1136,14 @@ export default function EppDeliveriesPage() {
                                   'w-fit rounded-md px-2 py-1 text-[10px] font-black transition',
                                   epp.status === 'ACTIVO'
                                     ? 'bg-green-100 text-green-700 hover:bg-red-100 hover:text-red-700'
-                                    : 'bg-gray-100 text-gray-500 hover:bg-green-100 hover:text-green-700'
+                                    : 'bg-red-100 text-red-700 hover:bg-green-100 hover:text-green-700'
                                 )}
                                 title={epp.status === 'ACTIVO' ? 'Click para dar de baja' : 'Click para reactivar'}
                               >
                                 {epp.status === 'ACTIVO' ? 'ACTIVO' : 'BAJA'}
                               </button>
                             ) : (
-                              <span className={cn('w-fit rounded-full px-2 py-1 text-xs font-black', epp.status === 'ACTIVO' ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-700')}>
+                              <span className={cn('w-fit rounded-full px-2 py-1 text-xs font-black', epp.status === 'ACTIVO' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700')}>
                                 {epp.status === 'ACTIVO' ? 'ACTIVO' : 'BAJA'}
                               </span>
                             )}
@@ -1140,13 +1172,14 @@ export default function EppDeliveriesPage() {
                                   type="button"
                                   onClick={() => confirmDeleteAssignment(epp)}
                                   className="rounded-md border border-[#DCDCDC] bg-white p-1 text-red-500 hover:bg-red-50"
-                                  title="Dar de baja"
+                                  title="Eliminar"
                                 >
                                   <Trash2 className="h-3 w-3" />
                                 </button>
                               </div>
                             )}
                           </div>
+                          </React.Fragment>
                         ))}
                       </div>
                     )}
