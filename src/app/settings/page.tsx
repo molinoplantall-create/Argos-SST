@@ -671,8 +671,10 @@ function EppCatalogTab() {
   const { showToast, showConfirm } = useFeedback();
   const [catalog, setCatalog] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({ name: '', bodyZone: '', unit: 'Unidad', certification: '' });
+  const [form, setForm] = useState({ name: '', bodyZone: '', unit: 'Unidad', certification: '', unit_price: '' });
   const [adding, setAdding] = useState(false);
+  const [editingItem, setEditingItem] = useState<any | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const loadCatalog = async () => {
     setLoading(true);
@@ -683,36 +685,46 @@ function EppCatalogTab() {
 
   useEffect(() => { loadCatalog(); }, []);
 
+  const toUpper = (v: string) => v.toUpperCase();
+
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim() || !form.bodyZone.trim()) return;
     setAdding(true);
-    
     const { data: { user } } = await supabase.auth.getUser();
     const { data: profile } = await supabase.from('profiles').select('client_id').eq('id', user!.id).single();
-    
     const { error } = await supabase.from('epp_catalog').insert({
-      name: form.name.trim(),
-      body_zone: form.bodyZone.trim(),
-      unit: form.unit.trim(),
-      certification: form.certification.trim(),
+      name: form.name.trim().toUpperCase(),
+      body_zone: form.bodyZone.trim().toUpperCase(),
+      unit: form.unit.trim() || 'Unidad',
+      certification: form.certification.trim().toUpperCase() || null,
+      unit_price: form.unit_price ? parseFloat(form.unit_price) : null,
       client_id: (profile as any)?.client_id,
     });
     setAdding(false);
-    
-    if (error) {
-      showToast('Error al agregar EPP.', 'error');
-    } else {
-      showToast('EPP agregado al catálogo.', 'success');
-      setForm({ name: '', bodyZone: '', unit: 'Unidad', certification: '' });
-      loadCatalog();
-    }
+    if (error) { showToast('Error al agregar EPP.', 'error'); }
+    else { showToast('EPP agregado al catálogo.', 'success'); setForm({ name: '', bodyZone: '', unit: 'Unidad', certification: '', unit_price: '' }); loadCatalog(); }
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingItem) return;
+    setSaving(true);
+    const { error } = await supabase.from('epp_catalog').update({
+      name: editingItem.name?.toUpperCase(),
+      body_zone: editingItem.body_zone?.toUpperCase(),
+      unit: editingItem.unit,
+      certification: editingItem.certification?.toUpperCase() || null,
+      unit_price: editingItem.unit_price ? parseFloat(editingItem.unit_price) : null,
+    }).eq('id', editingItem.id);
+    setSaving(false);
+    if (error) { showToast('Error al guardar.', 'error'); }
+    else { showToast('EPP actualizado.', 'success'); setEditingItem(null); loadCatalog(); }
   };
 
   const handleDelete = (id: string, name: string) => {
     showConfirm({
       title: 'Eliminar EPP',
-      message: `¿Seguro que deseas eliminar ${name}? Esto afectará a sus historiales si existen.`,
+      message: `¿Seguro que deseas eliminar ${name}?`,
       onConfirm: async () => {
         const { error } = await supabase.from('epp_catalog').delete().eq('id', id);
         if (error) showToast('Error al eliminar.', 'error');
@@ -726,25 +738,32 @@ function EppCatalogTab() {
       <h2 className="text-lg font-black text-[#134686]">Catálogo de EPP</h2>
 
       <form onSubmit={handleAdd} className="bg-white border border-[#DCDCDC] p-4 rounded-xl space-y-3">
-        <p className="text-sm font-bold text-[#1a1a1a]">Agregar EPP</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <input required type="text" placeholder="Nombre EPP (Ej: Casco)" value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="input-std" />
+        <p className="text-sm font-bold text-[#1a1a1a]">Agregar EPP al catálogo</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <input required type="text" placeholder="Nombre EPP (Ej: CASCO)" value={form.name}
+            onChange={e => setForm({...form, name: toUpper(e.target.value)})} className="input-std uppercase" />
           <select required value={form.bodyZone} onChange={e => setForm({...form, bodyZone: e.target.value})} className="input-std">
             <option value="">Zona del Cuerpo</option>
-            <option value="CABEZA">Cabeza</option>
-            <option value="OJOS">Ojos</option>
-            <option value="OIDOS">Oídos</option>
-            <option value="RESPIRATORIO">Respiratorio</option>
-            <option value="TORSO">Torso</option>
-            <option value="MANOS">Manos</option>
-            <option value="PIERNAS">Piernas</option>
-            <option value="PIES">Pies</option>
-            <option value="OTROS">Otros</option>
+            <option value="CABEZA">CABEZA</option>
+            <option value="OJOS">OJOS</option>
+            <option value="OIDOS">OÍDOS</option>
+            <option value="RESPIRATORIO">RESPIRATORIO</option>
+            <option value="TORSO">TORSO</option>
+            <option value="MANOS">MANOS</option>
+            <option value="PIERNAS">PIERNAS</option>
+            <option value="PIES">PIES</option>
+            <option value="CUERPO COMPLETO">CUERPO COMPLETO</option>
+            <option value="OTROS">OTROS</option>
           </select>
-          <input type="text" placeholder="Unidad (Ej: Unidad, Par)" value={form.unit} onChange={e => setForm({...form, unit: e.target.value})} className="input-std" />
-          <input type="text" placeholder="Certificación (Opcional)" value={form.certification} onChange={e => setForm({...form, certification: e.target.value})} className="input-std" />
+          <input type="text" placeholder="Unidad (Ej: Unidad, Par)" value={form.unit}
+            onChange={e => setForm({...form, unit: e.target.value})} className="input-std" />
+          <input type="text" placeholder="Certificación (Ej: ANSI, NIOSH)" value={form.certification}
+            onChange={e => setForm({...form, certification: toUpper(e.target.value)})} className="input-std uppercase" />
+          <input type="number" min={0} step="0.01" placeholder="Precio unitario (S/)" value={form.unit_price}
+            onChange={e => setForm({...form, unit_price: e.target.value})} className="input-std" />
         </div>
-        <button type="submit" disabled={adding} className="w-full sm:w-auto px-4 py-2.5 bg-[#FF7F11] text-white rounded-xl text-sm font-bold hover:bg-[#e66f00] transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+        <button type="submit" disabled={adding}
+          className="w-full sm:w-auto px-4 py-2.5 bg-[#FF7F11] text-white rounded-xl text-sm font-bold hover:bg-[#e66f00] transition-all disabled:opacity-50 flex items-center justify-center gap-2">
           {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Agregar al Catálogo
         </button>
       </form>
@@ -759,15 +778,53 @@ function EppCatalogTab() {
       ) : (
         <div className="space-y-2">
           {catalog.map((item) => (
-            <div key={item.id} className="flex items-center justify-between bg-white border border-[#DCDCDC] rounded-xl px-4 py-3">
-              <div>
-                <p className="font-black text-[#1a1a1a] text-sm">{item.name}</p>
-                <p className="text-xs text-gray-500">Zona: {item.body_zone} | {item.unit} {item.certification && `| Cert: ${item.certification}`}</p>
+            editingItem?.id === item.id ? (
+              <div key={item.id} className="bg-white border-2 border-[#1E93AB] rounded-xl p-4 space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  <input type="text" value={editingItem.name || ''} placeholder="Nombre"
+                    onChange={e => setEditingItem({...editingItem, name: toUpper(e.target.value)})} className="input-std uppercase" />
+                  <select value={editingItem.body_zone || ''} onChange={e => setEditingItem({...editingItem, body_zone: e.target.value})} className="input-std">
+                    <option value="CABEZA">CABEZA</option><option value="OJOS">OJOS</option>
+                    <option value="OIDOS">OÍDOS</option><option value="RESPIRATORIO">RESPIRATORIO</option>
+                    <option value="TORSO">TORSO</option><option value="MANOS">MANOS</option>
+                    <option value="PIERNAS">PIERNAS</option><option value="PIES">PIES</option>
+                    <option value="CUERPO COMPLETO">CUERPO COMPLETO</option><option value="OTROS">OTROS</option>
+                  </select>
+                  <input type="text" value={editingItem.unit || ''} placeholder="Unidad"
+                    onChange={e => setEditingItem({...editingItem, unit: e.target.value})} className="input-std" />
+                  <input type="text" value={editingItem.certification || ''} placeholder="Certificación"
+                    onChange={e => setEditingItem({...editingItem, certification: toUpper(e.target.value)})} className="input-std uppercase" />
+                  <input type="number" min={0} step="0.01" value={editingItem.unit_price ?? ''} placeholder="Precio (S/)"
+                    onChange={e => setEditingItem({...editingItem, unit_price: e.target.value})} className="input-std" />
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => setEditingItem(null)} className="px-3 py-1.5 border border-[#DCDCDC] rounded-lg text-sm font-bold text-gray-600 hover:bg-gray-50">Cancelar</button>
+                  <button onClick={handleSaveEdit} disabled={saving}
+                    className="px-3 py-1.5 bg-[#1E93AB] text-white rounded-lg text-sm font-bold hover:bg-[#167082] disabled:opacity-50 flex items-center gap-1">
+                    {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : null} Guardar
+                  </button>
+                </div>
               </div>
-              <button onClick={() => handleDelete(item.id, item.name)} className="p-2 text-gray-400 hover:text-red-500 transition-colors">
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
+            ) : (
+              <div key={item.id} className="flex items-center justify-between bg-white border border-[#DCDCDC] rounded-xl px-4 py-3 hover:border-[#1E93AB]/40 transition-colors">
+                <div className="min-w-0 flex-1">
+                  <p className="font-black text-[#1a1a1a] text-sm">{item.name}</p>
+                  <p className="text-xs text-gray-500">
+                    {item.body_zone} | {item.unit}
+                    {item.certification && ` | ${item.certification}`}
+                    {item.unit_price != null && ` | S/ ${Number(item.unit_price).toFixed(2)}`}
+                  </p>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <button onClick={() => setEditingItem({...item})} className="p-2 text-[#1E93AB] hover:bg-[#1E93AB]/10 rounded-lg transition-colors" title="Editar">
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => handleDelete(item.id, item.name)} className="p-2 text-gray-400 hover:text-red-500 rounded-lg transition-colors" title="Eliminar">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )
           ))}
         </div>
       )}

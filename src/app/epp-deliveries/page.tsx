@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsAdmin } from '@/lib/useIsAdmin';
+import { ResumenPanel, HistorialPanel, EditAssignmentModal } from './RightColumn';
 
 type CatalogItem = {
   id: string;
@@ -57,6 +58,7 @@ type WorkerAssignment = {
   unit_price?: number;
   currency?: string;
   observation?: string;
+  delivery_item_id?: string;
 };
 
 type DeliveryItem = CatalogItem & {
@@ -221,7 +223,7 @@ export default function EppDeliveriesPage() {
     try {
       const { data: assignmentRows } = await supabase
         .from('worker_epp_assignments')
-        .select('id, epp_name, body_zone, size, certification, assigned_date, status, current_condition, epp_delivery_items(unit_price, currency)')
+        .select('id, epp_name, body_zone, size, certification, assigned_date, status, current_condition, delivery_item_id, epp_delivery_items(unit_price, currency)')
         .eq('worker_id', workerId)
         .order('assigned_date', { ascending: false });
 
@@ -297,7 +299,7 @@ export default function EppDeliveriesPage() {
       .update({
         status: newStatus,
         current_condition: isActive ? 'BAJA' : 'BUENO',
-        end_date: isActive ? new Date().toISOString() : null,
+        deactivated_at: isActive ? new Date().toISOString() : null,
       })
       .eq('id', assignment.id);
 
@@ -326,7 +328,7 @@ export default function EppDeliveriesPage() {
         .update({ 
           status: 'BAJA', 
           current_condition: 'BAJA',
-          end_date: new Date().toISOString()
+          deactivated_at: new Date().toISOString()
         })
         .eq('id', assignment.id);
       if (error) throw error;
@@ -341,11 +343,15 @@ export default function EppDeliveriesPage() {
   async function saveAssignmentEdit(id: string, updates: Partial<WorkerAssignment>) {
     try {
       setLoadingCurrentEpps(true);
+      const { unit_price, delivery_item_id, ...assignmentUpdates } = updates;
       const { error } = await supabase
         .from('worker_epp_assignments')
-        .update(updates)
+        .update(assignmentUpdates)
         .eq('id', id);
       if (error) throw error;
+      if (unit_price !== undefined && delivery_item_id) {
+        await supabase.from('epp_delivery_items').update({ unit_price }).eq('id', delivery_item_id);
+      }
       showToast('Asignación actualizada', 'success');
       if (selectedWorkerId) await loadWorkerCurrentEpps(selectedWorkerId);
       setEditingAssignment(null);
