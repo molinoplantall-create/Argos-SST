@@ -1160,17 +1160,17 @@ export default function EppDeliveriesPage() {
             )}
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-3">
             <Panel className="overflow-hidden bg-[#134686] text-white">
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-black uppercase tracking-widest text-[#FFB26B]">Resumen</p>
-                  <h2 className="mt-2 truncate text-xl font-bold">{selectedWorker?.full_name || 'Sin trabajador'}</h2>
+                  <h2 className="mt-1 truncate text-base font-bold">{selectedWorker?.full_name || 'Sin trabajador'}</h2>
                 </div>
-                <PackageCheck className="h-8 w-8 flex-shrink-0 text-[#FF7F11]" />
+                <PackageCheck className="h-7 w-7 flex-shrink-0 text-[#FF7F11]" />
               </div>
 
-              <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2 min-w-0">
+              <div className="mt-2 grid grid-cols-2 gap-2 min-w-0">
                 <div className="min-w-0 rounded-md border border-white/10 bg-white/5 p-2">
                   <p className="text-xs text-gray-300">Items</p>
                   <p className="mt-1 text-base font-black">{items.length}</p>
@@ -1189,7 +1189,7 @@ export default function EppDeliveriesPage() {
                 </div>
               </div>
 
-              <div className="mt-3 space-y-1.5 text-sm text-gray-200 min-w-0">
+              <div className="mt-2 space-y-1.5 text-sm text-gray-200 min-w-0">
                 <div className="flex justify-between gap-3 min-w-0">
                   <span className="shrink-0">Fecha</span>
                   <strong className="truncate">{deliveryDate}</strong>
@@ -1212,21 +1212,21 @@ export default function EppDeliveriesPage() {
             </Panel>
 
             <Panel>
-              <h2 className="mb-4 text-sm font-black uppercase tracking-widest text-[#134686]">Historial de entregas</h2>
+              <h2 className="mb-2 text-sm font-black uppercase tracking-widest text-[#134686]">Historial de entregas</h2>
               {recentDeliveries.length === 0 ? (
                 <p className="text-sm text-gray-500">No hay entregas registradas aún.</p>
               ) : (
                 <div className="max-h-[280px] space-y-2 overflow-y-auto pr-1">
                   {recentDeliveries.map((delivery) => (
-                    <div key={delivery.id} className="rounded-md border border-[#E5E7EB] p-3">
+                    <div key={delivery.id} className="rounded-md border border-[#E5E7EB] p-2">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <p className="text-xs font-black text-[#1E93AB]">{delivery.document_code || 'SIN COD'}</p>
-                          <p className="mt-1 truncate font-bold text-[#134686]">{delivery.workers?.full_name}</p>
+                          <p className="mt-0.5 truncate text-sm font-bold text-[#134686]">{delivery.workers?.full_name}</p>
                         </div>
                         <StatusBadge status={getDeliveryStatus(delivery)} />
                       </div>
-                      <div className="mt-3 flex items-center justify-between gap-2 text-xs text-gray-500">
+                      <div className="mt-2 flex items-center justify-between gap-2 text-xs text-gray-500">
                         <span>{delivery.delivery_date} · {delivery.epp_delivery_items?.[0]?.count ?? 0} EPP</span>
                         <button
                           type="button"

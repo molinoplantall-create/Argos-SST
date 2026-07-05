@@ -109,7 +109,7 @@ function DesktopSidebar() {
       </nav>
 
       {/* Footer Sidebar — fixed at bottom, never scrolls */}
-      <div className="mt-auto flex-none p-4 border-t border-white/10 flex flex-col gap-2 relative">
+      <div className="mt-auto flex-none p-4 border-t border-white/10 flex flex-col gap-2">
         {loading ? (
           <div className="animate-pulse bg-white/10 h-12 w-full rounded-xl" />
         ) : profile ? (
@@ -144,11 +144,17 @@ function DesktopSidebar() {
           )
         ) : null}
 
+        {/* Toggle button — visible outside overflow bounds */}
         <button
           onClick={toggle}
-          className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-[#134686] border border-white/10 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition-colors"
+          className={cn(
+            'mt-2 flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-bold text-gray-400 transition hover:bg-white/10 hover:text-white',
+            collapsed ? 'w-full' : 'w-full'
+          )}
+          title={collapsed ? 'Expandir sidebar' : 'Colapsar sidebar'}
         >
           {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+          {!collapsed && <span>Colapsar</span>}
         </button>
       </div>
     </aside>
@@ -308,8 +314,8 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
       <div className="flex-1 flex flex-col min-h-screen min-w-0">
         <MobileHeader onMoreClick={() => setMoreOpen(true)} />
 
-        <main className="flex-1 p-4 md:p-8 overflow-y-auto pb-24 md:pb-8">
-          <div className="max-w-7xl mx-auto">{children}</div>
+        <main className="flex-1 p-4 md:p-6 overflow-y-auto overflow-x-hidden pb-24 md:pb-6">
+          <div className="w-full">{children}</div>
         </main>
       </div>
 
