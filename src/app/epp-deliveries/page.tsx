@@ -152,7 +152,6 @@ export default function EppDeliveriesPage() {
   const [editingDeliveryId, setEditingDeliveryId] = useState<string | null>(null);
   const [editingDocumentCode, setEditingDocumentCode] = useState('');
   const [editingStatus, setEditingStatus] = useState('');
-  
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [saving, setSaving] = useState(false);
   const [items, setItems] = useState<DeliveryItem[]>([]);
@@ -170,7 +169,6 @@ export default function EppDeliveriesPage() {
       .select('id, document_code, delivery_date, status, delivered_by_signature_url, workers(full_name), epp_delivery_items(count, worker_signature_url)')
       .order('created_at', { ascending: false })
       .limit(8);
-
     if (data) setRecentDeliveries(data as RecentDelivery[]);
   }
 
@@ -181,13 +179,11 @@ export default function EppDeliveriesPage() {
         const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).single();
         if (profile) setDeliveredBy(profile.full_name);
       }
-
       const [wRes, cRes, dRes] = await Promise.all([
         supabase.from('workers').select('*').eq('status', 'ACTIVO').order('full_name'),
         supabase.from('epp_catalog').select('*').eq('is_active', true).order('name'),
         supabase.from('epp_deliveries').select('id, document_code, delivery_date, status, delivered_by_signature_url, workers(full_name), epp_delivery_items(count, worker_signature_url)').order('created_at', { ascending: false }).limit(8)
       ]);
-
       if (wRes.data) setWorkers(wRes.data);
       if (cRes.data) {
         setCatalog(cRes.data);
@@ -217,11 +213,13 @@ export default function EppDeliveriesPage() {
     `${item.name} ${item.body_zone} ${item.certification ?? ''}`.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // When search filter changes, reset selected EPP to the first visible result
   useEffect(() => {
     if (filteredCatalog.length > 0 && !filteredCatalog.some(item => item.id === selectedEppId)) {
       setSelectedEppId(filteredCatalog[0].id);
     }
-  }, [filteredCatalog, selectedEppId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm]);
 
   async function loadWorkerCurrentEpps(workerId: string) {
     setLoadingCurrentEpps(true);
@@ -232,28 +230,24 @@ export default function EppDeliveriesPage() {
         .eq('worker_id', workerId)
         .order('assigned_date', { ascending: false });
 
-      let assignments: any[] | null = assignmentRows;
-
-      if (assignments) {
-        const normalized = assignments.map((assignment: any) => {
+      if (assignmentRows) {
+        const normalized = assignmentRows.map((assignment: any) => {
           const deliveredItem = Array.isArray(assignment.epp_delivery_items)
             ? assignment.epp_delivery_items[0]
             : assignment.epp_delivery_items;
           const catalogItem = catalog.find((item) => item.id === assignment.epp_id || item.name === assignment.epp_name);
           const deliveredPrice = Number(deliveredItem?.unit_price ?? assignment.unit_price ?? 0);
           const catalogPrice = Number(catalogItem?.unit_price ?? 0);
-
           return {
             ...assignment,
             unit_price: deliveredPrice > 0 ? deliveredPrice : catalogPrice,
             currency: deliveredItem?.currency ?? catalogItem?.currency ?? assignment.currency ?? 'PEN',
           };
-        }).sort((a, b) => {
+        }).sort((a: any, b: any) => {
           if (a.status === 'ACTIVO' && b.status !== 'ACTIVO') return -1;
           if (a.status !== 'ACTIVO' && b.status === 'ACTIVO') return 1;
           return String(b.assigned_date ?? '').localeCompare(String(a.assigned_date ?? ''));
         });
-
         setWorkerCurrentEpps(normalized);
       }
     } finally {
@@ -275,58 +269,39 @@ export default function EppDeliveriesPage() {
     setWorkerCurrentEpps([]);
     setShowCurrentEpps(true);
     setShowAllCurrentEpps(false);
-
     await loadWorkerCurrentEpps(worker.id);
   }
 
   async function toggleAssignmentStatus(assignment: WorkerAssignment) {
     if (!isAdmin) return;
-
     const isActive = assignment.status === 'ACTIVO';
     const newStatus = isActive ? 'BAJA' : 'ACTIVO';
-
     showConfirm({
       title: isActive ? 'Dar de baja EPP' : 'Reactivar EPP',
       message: isActive
-        ? `¿Confirmas dar de baja "${assignment.epp_name}"? El registro se conservará en historial y pasará al final de la lista.`
+        ? `¿Confirmas dar de baja "${assignment.epp_name}"? El registro se conservará en historial.`
         : `¿Confirmas reactivar "${assignment.epp_name}"? Volverá a mostrarse como activo.`,
       onConfirm: async () => {
         const { error } = await supabase
           .from('worker_epp_assignments')
-          .update({
-            status: newStatus,
-            current_condition: isActive ? 'BAJA' : 'BUENO',
-            deactivated_at: isActive ? new Date().toISOString() : null,
-          })
+          .update({ status: newStatus, current_condition: isActive ? 'BAJA' : 'BUENO', deactivated_at: isActive ? new Date().toISOString() : null })
           .eq('id', assignment.id);
-
-        if (error) {
-          showToast(error.message, 'error');
-          return;
-        }
-
+        if (error) { showToast(error.message, 'error'); return; }
         showToast(`EPP ${assignment.epp_name} marcado como ${newStatus}`, 'success');
-
-        if (selectedWorkerId) {
-          await loadWorkerCurrentEpps(selectedWorkerId);
-        }
+        if (selectedWorkerId) await loadWorkerCurrentEpps(selectedWorkerId);
       },
     });
   }
 
   async function confirmDeleteAssignment(assignment: WorkerAssignment) {
     if (!isAdmin) return;
-
     showConfirm({
       title: 'Eliminar EPP asignado',
-      message: `¿Confirmas eliminar definitivamente "${assignment.epp_name}" de los EPP actuales del trabajador? Esta acción quita la asignación; no es una baja.`,
+      message: `¿Confirmas eliminar definitivamente "${assignment.epp_name}" de los EPP actuales del trabajador?`,
       onConfirm: async () => {
         try {
           setLoadingCurrentEpps(true);
-          const { error } = await supabase
-            .from('worker_epp_assignments')
-            .delete()
-            .eq('id', assignment.id);
+          const { error } = await supabase.from('worker_epp_assignments').delete().eq('id', assignment.id);
           if (error) throw error;
           showToast('EPP eliminado de la lista del trabajador.', 'success');
           if (selectedWorkerId) await loadWorkerCurrentEpps(selectedWorkerId);
@@ -342,10 +317,7 @@ export default function EppDeliveriesPage() {
     try {
       setLoadingCurrentEpps(true);
       const { unit_price, delivery_item_id, ...assignmentUpdates } = updates;
-      const { error } = await supabase
-        .from('worker_epp_assignments')
-        .update(assignmentUpdates)
-        .eq('id', id);
+      const { error } = await supabase.from('worker_epp_assignments').update(assignmentUpdates).eq('id', id);
       if (error) throw error;
       if (unit_price !== undefined && delivery_item_id) {
         await supabase.from('epp_delivery_items').update({ unit_price }).eq('id', delivery_item_id);
@@ -380,13 +352,11 @@ export default function EppDeliveriesPage() {
   }
 
   function removeItem(index: number) {
-    setItems((current) => current.filter((_, itemIndex) => itemIndex !== index));
+    setItems((current) => current.filter((_, i) => i !== index));
   }
 
   function updateItem(index: number, updates: Partial<DeliveryItem>) {
-    setItems((current) =>
-      current.map((item, i) => (i === index ? { ...item, ...updates } : item))
-    );
+    setItems((current) => current.map((item, i) => (i === index ? { ...item, ...updates } : item)));
   }
 
   function clearEditingState() {
@@ -400,55 +370,28 @@ export default function EppDeliveriesPage() {
     try {
       const { data, error } = await supabase
         .from('epp_deliveries')
-        .select(`
-          id,
-          document_code,
-          delivery_date,
-          status,
-          delivered_by_signature_url,
-          worker_id,
+        .select(`id, document_code, delivery_date, status, delivered_by_signature_url, worker_id,
           workers(id, full_name, document_number, position, area),
-          epp_delivery_items(
-            id,
-            epp_id,
-            epp_name,
-            body_zone,
-            quantity,
-            unit,
-            size,
-            certification,
-            unit_price,
-            currency,
-            observation,
-            worker_signature_url,
-            signed_at
-          )
-        `)
+          epp_delivery_items(id, epp_id, epp_name, body_zone, quantity, unit, size, certification, unit_price, currency, observation, worker_signature_url, signed_at)`)
         .eq('id', deliveryId)
         .single();
-
       if (error) throw error;
-
       const worker = Array.isArray(data.workers) ? data.workers[0] : data.workers;
       if (worker?.id) {
         const exists = workers.some((item) => item.id === worker.id);
         if (!exists) setWorkers((current) => [...current, worker as Worker]);
-        
         setSelectedWorkerId(worker.id);
         setWorkerSearch(`${worker.document_number} - ${worker.full_name}`);
-        
         setWorkerCurrentEpps([]);
         setShowCurrentEpps(true);
-    setShowAllCurrentEpps(false);
+        setShowAllCurrentEpps(false);
         await loadWorkerCurrentEpps(worker.id);
       }
-
       setEditingDeliveryId(data.id);
       setEditingDocumentCode(data.document_code ?? '');
       setEditingStatus(data.status ?? '');
       setDeliveryDate(data.delivery_date);
       setResponsibleSignatureUrl(data.delivered_by_signature_url ?? '');
-      
       setItems((data.epp_delivery_items ?? []).map((item: any) => ({
         id: item.epp_id ?? item.id,
         name: item.epp_name,
@@ -463,9 +406,8 @@ export default function EppDeliveriesPage() {
         workerSignatureUrl: item.worker_signature_url ?? undefined,
         signedAt: item.signed_at ?? undefined,
       })));
-      
       window.scrollTo({ top: 0, behavior: 'smooth' });
-      showToast('Entrega cargada para editar. Modifica los items y guarda.', 'success');
+      showToast('Entrega cargada para editar.', 'success');
     } catch (e: any) {
       showToast(e.message, 'error');
     } finally {
@@ -475,27 +417,15 @@ export default function EppDeliveriesPage() {
 
   function signItem(index: number, signatureUrl: string) {
     setItems((current) =>
-      current.map((item, itemIndex) =>
-        itemIndex === index
-          ? {
-              ...item,
-              workerSignatureUrl: signatureUrl,
-              signedAt: new Date().toISOString(),
-            }
-          : item
+      current.map((item, i) =>
+        i === index ? { ...item, workerSignatureUrl: signatureUrl, signedAt: new Date().toISOString() } : item
       )
     );
   }
 
   function saveSignature(signatureUrl: string) {
-    if (signatureTarget?.type === 'worker') {
-      signItem(signatureTarget.itemIndex, signatureUrl);
-    }
-
-    if (signatureTarget?.type === 'responsible') {
-      setResponsibleSignatureUrl(signatureUrl);
-    }
-
+    if (signatureTarget?.type === 'worker') signItem(signatureTarget.itemIndex, signatureUrl);
+    if (signatureTarget?.type === 'responsible') setResponsibleSignatureUrl(signatureUrl);
     setSignatureTarget(null);
   }
 
@@ -505,7 +435,6 @@ export default function EppDeliveriesPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       const { data: profile } = await supabase.from('profiles').select('client_id, id').eq('id', user!.id).single();
-      
       const docCode = editingDocumentCode || `R-SST-EPP-${Date.now().toString().slice(-4)}`;
       const deliveryPayload = {
         client_id: profile!.client_id,
@@ -516,42 +445,22 @@ export default function EppDeliveriesPage() {
         document_code: docCode,
         delivered_by_signature_url: responsibleSignatureUrl || null
       };
-
       let delivery: any;
-
       if (editingDeliveryId) {
         const { data: updatedDelivery, error: deliveryError } = await supabase
-          .from('epp_deliveries')
-          .update(deliveryPayload)
-          .eq('id', editingDeliveryId)
-          .select()
-          .single();
-
+          .from('epp_deliveries').update(deliveryPayload).eq('id', editingDeliveryId).select().single();
         if (deliveryError) throw deliveryError;
         delivery = updatedDelivery;
-
-        const { error: assignmentDeleteError } = await supabase
-          .from('worker_epp_assignments')
-          .delete()
-          .eq('delivery_id', editingDeliveryId);
-        if (assignmentDeleteError) throw assignmentDeleteError;
-
-        const { error: itemDeleteError } = await supabase
-          .from('epp_delivery_items')
-          .delete()
-          .eq('delivery_id', editingDeliveryId);
-        if (itemDeleteError) throw itemDeleteError;
+        const { error: e1 } = await supabase.from('worker_epp_assignments').delete().eq('delivery_id', editingDeliveryId);
+        if (e1) throw e1;
+        const { error: e2 } = await supabase.from('epp_delivery_items').delete().eq('delivery_id', editingDeliveryId);
+        if (e2) throw e2;
       } else {
         const { data: insertedDelivery, error: deliveryError } = await supabase
-          .from('epp_deliveries')
-          .insert(deliveryPayload)
-          .select()
-          .single();
-
+          .from('epp_deliveries').insert(deliveryPayload).select().single();
         if (deliveryError) throw deliveryError;
         delivery = insertedDelivery;
       }
-
       const deliveryItems = items.map(item => ({
         delivery_id: delivery.id,
         epp_id: item.id,
@@ -567,11 +476,8 @@ export default function EppDeliveriesPage() {
         worker_signature_url: item.workerSignatureUrl || null,
         signed_at: item.signedAt || null
       }));
-
       const { data: insertedItems, error: itemsError } = await supabase.from('epp_delivery_items').insert(deliveryItems).select();
-
       if (itemsError) throw itemsError;
-
       const assignments = items.map((item, idx) => ({
         client_id: profile!.client_id,
         worker_id: selectedWorker.id,
@@ -588,12 +494,9 @@ export default function EppDeliveriesPage() {
       }));
       const { error: assignmentsError } = await supabase.from('worker_epp_assignments').insert(assignments);
       if (assignmentsError) throw assignmentsError;
-
-      showToast(editingDeliveryId ? `Entrega actualizada como ${status}` : `Entrega guardada exitosamente como ${status}`, 'success');
-      
+      showToast(editingDeliveryId ? `Entrega actualizada como ${status}` : `Entrega guardada como ${status}`, 'success');
       await loadRecentDeliveries();
       await loadWorkerCurrentEpps(selectedWorker.id);
-
       setItems([]);
       setResponsibleSignatureUrl('');
       clearEditingState();
@@ -608,14 +511,10 @@ export default function EppDeliveriesPage() {
 
   async function downloadPdf() {
     if (items.length === 0 || !selectedWorker) return;
-
     setIsGeneratingPdf(true);
     try {
       const isFullySigned = responsibleSignatureUrl && items.every(i => i.workerSignatureUrl);
-      const deliveryStatus = isFullySigned ? 'FIRMADO' : 'BORRADOR';
-      
-      await saveDelivery(deliveryStatus);
-
+      await saveDelivery(isFullySigned ? 'FIRMADO' : 'BORRADOR');
       const response = await fetch('/api/reports/epp-delivery', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -623,43 +522,21 @@ export default function EppDeliveriesPage() {
           documentCode: 'R-MIC&M-SSO-008',
           revision: '02',
           deliveryDate,
-          client: {
-            legalName: 'ARGOS SST CLIENTE',
-            ruc: '20000000000',
-            address: 'LIMA',
-            activity: 'MINERIA',
-          },
-          worker: {
-            fullName: selectedWorker.full_name,
-            documentNumber: selectedWorker.document_number,
-            position: selectedWorker.position,
-            area: selectedWorker.area,
-          },
-          deliveredBy: {
-            fullName: deliveredBy,
-            signatureUrl: responsibleSignatureUrl,
-          },
+          client: { legalName: 'ARGOS SST CLIENTE', ruc: '20000000000', address: 'LIMA', activity: 'MINERIA' },
+          worker: { fullName: selectedWorker.full_name, documentNumber: selectedWorker.document_number, position: selectedWorker.position, area: selectedWorker.area },
+          deliveredBy: { fullName: deliveredBy, signatureUrl: responsibleSignatureUrl },
           items: items.map((item) => ({
-            name: item.name,
-            bodyZone: item.body_zone,
-            deliveryDate,
-            quantity: item.quantity,
-            unit: item.unit,
-            size: item.size,
-            certification: item.certification,
-            unitPrice: item.unit_price,
-            currency: item.currency ?? 'PEN',
-            observation: item.observation,
-            workerSignatureUrl: item.workerSignatureUrl,
+            name: item.name, bodyZone: item.body_zone, deliveryDate, quantity: item.quantity,
+            unit: item.unit, size: item.size, certification: item.certification,
+            unitPrice: item.unit_price, currency: item.currency ?? 'PEN',
+            observation: item.observation, workerSignatureUrl: item.workerSignatureUrl,
           })),
         }),
       });
-
       if (!response.ok) {
-        const error = await response.json().catch(() => null);
-        throw new Error(error?.error || 'No se pudo generar el PDF.');
+        const err = await response.json().catch(() => null);
+        throw new Error(err?.error || 'No se pudo generar el PDF.');
       }
-
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -679,6 +556,7 @@ export default function EppDeliveriesPage() {
   return (
     <IndustrialLayout>
       <div className="space-y-3">
+        {/* Header */}
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-[#1E93AB]">
@@ -691,11 +569,7 @@ export default function EppDeliveriesPage() {
             {editingDeliveryId && (
               <button
                 type="button"
-                onClick={() => {
-                  setItems([]);
-                  setResponsibleSignatureUrl('');
-                  clearEditingState();
-                }}
+                onClick={() => { setItems([]); setResponsibleSignatureUrl(''); clearEditingState(); }}
                 className="flex items-center gap-2 rounded-md border border-[#DCDCDC] bg-white px-4 py-2 text-sm font-bold text-gray-600 transition hover:border-[#1E93AB] hover:text-[#1E93AB]"
               >
                 Cancelar edicion
@@ -715,9 +589,7 @@ export default function EppDeliveriesPage() {
               disabled={items.length === 0 || isGeneratingPdf || saving}
               className={cn(
                 'flex items-center gap-2 rounded-md px-4 py-2 text-sm font-bold text-white transition',
-                items.length === 0 || isGeneratingPdf || saving
-                  ? 'cursor-not-allowed bg-gray-400'
-                  : 'bg-[#134686] hover:bg-[#1E93AB]'
+                items.length === 0 || isGeneratingPdf || saving ? 'cursor-not-allowed bg-gray-400' : 'bg-[#134686] hover:bg-[#1E93AB]'
               )}
             >
               {isGeneratingPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
@@ -727,7 +599,9 @@ export default function EppDeliveriesPage() {
         </div>
 
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1.2fr_0.8fr]">
+          {/* ── COLUMNA IZQUIERDA ── */}
           <div className="space-y-3">
+            {/* Panel: Datos de entrega */}
             <Panel>
               <div className="mb-2 flex items-center justify-between gap-3">
                 <h2 className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-[#111827]">
@@ -738,7 +612,6 @@ export default function EppDeliveriesPage() {
                   {editingDeliveryId ? `Editando ${editingDocumentCode || 'entrega'}` : 'R-MICM-SSO-008'}
                 </span>
               </div>
-
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <label className="space-y-1 xl:col-span-2">
                   <span className="text-xs font-bold text-gray-500">Buscar trabajador por DNI o nombre</span>
@@ -748,16 +621,16 @@ export default function EppDeliveriesPage() {
                       list="delivery-workers-list"
                       className={cn(fieldClass, 'pl-9')}
                       value={workerSearch}
-                      onChange={(event) => {
-                        const value = event.target.value;
+                      onChange={(e) => {
+                        const value = e.target.value;
                         setWorkerSearch(value);
-                        const found = workers.find((worker) => value.includes(worker.document_number) || value.includes(worker.full_name));
+                        const found = workers.find((w) => value.includes(w.document_number) || value.includes(w.full_name));
                         if (found) selectWorker(found.id);
                       }}
                     />
                     <datalist id="delivery-workers-list">
-                      {workers.map((worker) => (
-                        <option key={worker.id} value={`${worker.document_number} - ${worker.full_name}`} />
+                      {workers.map((w) => (
+                        <option key={w.id} value={`${w.document_number} - ${w.full_name}`} />
                       ))}
                     </datalist>
                   </div>
@@ -774,20 +647,15 @@ export default function EppDeliveriesPage() {
                   <span className="text-xs font-bold text-gray-500">Area</span>
                   <input className={fieldClass} value={selectedWorker?.area || ''} readOnly />
                 </label>
-                <label className="space-y-1 md:col-span-1">
+                <label className="space-y-1">
                   <span className="text-xs font-bold text-gray-500">Responsable</span>
-                  <input className={fieldClass} value={deliveredBy} onChange={(event) => setDeliveredBy(event.target.value)} />
+                  <input className={fieldClass} value={deliveredBy} onChange={(e) => setDeliveredBy(e.target.value)} />
                 </label>
-                <label className="space-y-1 md:col-span-1">
+                <label className="space-y-1">
                   <span className="text-xs font-bold text-gray-500">Fecha</span>
                   <div className="relative">
                     <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                    <input
-                      type="date"
-                      className={cn(fieldClass, 'pl-9')}
-                      value={deliveryDate}
-                      onChange={(event) => setDeliveryDate(event.target.value)}
-                    />
+                    <input type="date" className={cn(fieldClass, 'pl-9')} value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} />
                   </div>
                 </label>
                 <div className="flex items-end">
@@ -796,9 +664,7 @@ export default function EppDeliveriesPage() {
                     onClick={() => setSignatureTarget({ type: 'responsible', title: `Firma del responsable: ${deliveredBy}` })}
                     className={cn(
                       'flex h-10 w-full items-center justify-center gap-2 rounded-md px-3 text-sm font-black transition',
-                      responsibleSignatureUrl
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-[#134686] text-white hover:bg-[#1E93AB]'
+                      responsibleSignatureUrl ? 'bg-green-100 text-green-700' : 'bg-[#134686] text-white hover:bg-[#1E93AB]'
                     )}
                   >
                     <FileSignature className="h-4 w-4" />
@@ -808,6 +674,7 @@ export default function EppDeliveriesPage() {
               </div>
             </Panel>
 
+            {/* Panel: EPP Entregado */}
             <Panel>
               <div className="mb-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <h2 className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-[#111827]">
@@ -820,7 +687,7 @@ export default function EppDeliveriesPage() {
                     className={cn(fieldClass, 'pl-9')}
                     placeholder="Buscar en catalogo"
                     value={searchTerm}
-                    onChange={(event) => setSearchTerm(event.target.value)}
+                    onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
               </div>
@@ -828,7 +695,7 @@ export default function EppDeliveriesPage() {
               <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1.3fr_0.35fr_0.35fr_0.55fr_0.9fr_1fr_auto]">
                 <label className="space-y-1">
                   <span className="text-xs font-bold text-gray-500">EPP</span>
-                  <select className={fieldClass} value={selectedEppId} onChange={(event) => setSelectedEppId(event.target.value)}>
+                  <select className={fieldClass} value={selectedEppId} onChange={(e) => setSelectedEppId(e.target.value)}>
                     {filteredCatalog.map((item) => (
                       <option key={item.id} value={item.id}>
                         {item.name} - {item.body_zone}
@@ -838,41 +705,23 @@ export default function EppDeliveriesPage() {
                 </label>
                 <label className="space-y-1">
                   <span className="text-xs font-bold text-gray-500">Cantidad</span>
-                  <input
-                    type="number"
-                    min={1}
-                    className={fieldClass}
-                    value={quantity}
-                    onChange={(event) => setQuantity(Number(event.target.value))}
-                  />
+                  <input type="number" min={1} className={fieldClass} value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} />
                 </label>
                 <label className="space-y-1">
                   <span className="text-xs font-bold text-gray-500">Talla</span>
-                  <input className={fieldClass} value={size} onChange={(event) => setSize(event.target.value)} />
+                  <input className={fieldClass} value={size} onChange={(e) => setSize(e.target.value)} />
                 </label>
                 <label className="space-y-1">
                   <span className="text-xs font-bold text-gray-500">Precio</span>
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    className={fieldClass}
-                    value={unitPrice}
-                    onChange={(event) => setUnitPrice(Number(event.target.value))}
-                  />
+                  <input type="number" min={0} step="0.01" className={fieldClass} value={unitPrice} onChange={(e) => setUnitPrice(Number(e.target.value))} />
                 </label>
                 <label className="space-y-1">
                   <span className="text-xs font-bold text-gray-500">Certificacion</span>
-                  <input
-                    className={fieldClass}
-                    value={certification}
-                    onChange={(event) => setCertification(event.target.value)}
-                    placeholder="ANSI, NIOSH, EN, ASTM..."
-                  />
+                  <input className={fieldClass} value={certification} onChange={(e) => setCertification(e.target.value)} placeholder="ANSI, NIOSH..." />
                 </label>
                 <label className="space-y-1">
                   <span className="text-xs font-bold text-gray-500">Observacion</span>
-                  <input className={fieldClass} value={observation} onChange={(event) => setObservation(event.target.value)} />
+                  <input className={fieldClass} value={observation} onChange={(e) => setObservation(e.target.value)} />
                 </label>
                 <div className="flex items-end">
                   <button
@@ -915,9 +764,7 @@ export default function EppDeliveriesPage() {
                         </td>
                         <td className="py-2 text-center">
                           <input
-                            type="number"
-                            min={1}
-                            value={item.quantity}
+                            type="number" min={1} value={item.quantity}
                             onChange={(e) => updateItem(index, { quantity: parseInt(e.target.value) || 1 })}
                             className="w-16 rounded border border-[#DCDCDC] px-2 py-1 text-sm outline-none focus:border-[#1E93AB]"
                           />
@@ -928,26 +775,16 @@ export default function EppDeliveriesPage() {
                             return availableSizes.length > 0 ? (
                               <div className="flex flex-wrap gap-1">
                                 {availableSizes.map((s: string) => (
-                                  <button
-                                    key={s}
-                                    type="button"
-                                    onClick={() => updateItem(index, { size: s })}
-                                    className={cn(
-                                      'rounded-md border px-2 py-1 text-xs font-bold',
-                                      item.size === s
-                                        ? 'border-[#FF7F11] bg-[#FF7F11] text-white'
-                                        : 'border-[#DCDCDC] bg-white text-gray-700 hover:border-[#1E93AB]'
-                                    )}
-                                  >
+                                  <button key={s} type="button" onClick={() => updateItem(index, { size: s })}
+                                    className={cn('rounded-md border px-2 py-1 text-xs font-bold',
+                                      item.size === s ? 'border-[#FF7F11] bg-[#FF7F11] text-white' : 'border-[#DCDCDC] bg-white text-gray-700 hover:border-[#1E93AB]'
+                                    )}>
                                     {s}
                                   </button>
                                 ))}
                               </div>
                             ) : (
-                              <input
-                                type="text"
-                                placeholder="Ej: M, 42"
-                                value={item.size ?? ''}
+                              <input type="text" placeholder="Ej: M, 42" value={item.size ?? ''}
                                 onChange={(e) => updateItem(index, { size: e.target.value })}
                                 className="w-20 rounded border border-[#DCDCDC] px-2 py-1 text-sm outline-none focus:border-[#1E93AB]"
                               />
@@ -957,19 +794,12 @@ export default function EppDeliveriesPage() {
                         <td className="py-2">
                           <div className="flex flex-col gap-1 items-end">
                             <div className="flex gap-1">
-                              <select
-                                value={item.currency ?? 'PEN'}
-                                onChange={(e) => updateItem(index, { currency: e.target.value })}
-                                className="w-12 rounded border border-[#DCDCDC] px-1 py-1 text-xs outline-none focus:border-[#1E93AB]"
-                              >
+                              <select value={item.currency ?? 'PEN'} onChange={(e) => updateItem(index, { currency: e.target.value })}
+                                className="w-12 rounded border border-[#DCDCDC] px-1 py-1 text-xs outline-none focus:border-[#1E93AB]">
                                 <option value="PEN">S/</option>
                                 <option value="USD">$</option>
                               </select>
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={item.unit_price ?? 0}
+                              <input type="number" step="0.01" min="0" value={item.unit_price ?? 0}
                                 onChange={(e) => updateItem(index, { unit_price: parseFloat(e.target.value) || 0 })}
                                 className="w-20 rounded border border-[#DCDCDC] px-2 py-1 text-sm outline-none text-right focus:border-[#1E93AB]"
                               />
@@ -980,40 +810,26 @@ export default function EppDeliveriesPage() {
                           </div>
                         </td>
                         <td className="py-2">
-                          <input
-                            type="text"
-                            value={item.observation ?? ''}
-                            onChange={(e) => updateItem(index, { observation: e.target.value })}
+                          <input type="text" value={item.observation ?? ''} onChange={(e) => updateItem(index, { observation: e.target.value })}
                             className="w-full min-w-[120px] rounded border border-[#DCDCDC] px-2 py-1 text-sm outline-none focus:border-[#1E93AB]"
                           />
                         </td>
                         <td className="py-2">
                           {item.workerSignatureUrl ? (
                             <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-1 text-xs font-black text-green-700">
-                              <FileSignature className="h-3 w-3" />
-                              Firmado
+                              <FileSignature className="h-3 w-3" /> Firmado
                             </span>
                           ) : (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setSignatureTarget({
-                                  type: 'worker',
-                                  itemIndex: index,
-                                  title: `Firma de ${selectedWorker?.full_name} por ${item.name}`,
-                                })
-                              }
+                            <button type="button"
+                              onClick={() => setSignatureTarget({ type: 'worker', itemIndex: index, title: `Firma de ${selectedWorker?.full_name} por ${item.name}` })}
                               className="inline-flex items-center gap-1 rounded-md border border-[#DCDCDC] px-2 py-1 text-xs font-black text-[#134686] transition hover:border-[#1E93AB] hover:text-[#1E93AB]"
                             >
-                              <FileSignature className="h-3 w-3" />
-                              Firmar
+                              <FileSignature className="h-3 w-3" /> Firmar
                             </button>
                           )}
                         </td>
                         <td className="py-2 text-right">
-                          <button
-                            type="button"
-                            onClick={() => removeItem(index)}
+                          <button type="button" onClick={() => removeItem(index)}
                             className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition hover:bg-red-50 hover:text-red-600"
                             aria-label="Eliminar EPP"
                           >
@@ -1034,11 +850,10 @@ export default function EppDeliveriesPage() {
               </div>
             </Panel>
 
+            {/* Panel: EPP actuales del trabajador */}
             {selectedWorkerId && (
               <Panel>
-                <button
-                  type="button"
-                  onClick={() => setShowCurrentEpps((v) => !v)}
+                <button type="button" onClick={() => setShowCurrentEpps((v) => !v)}
                   className="flex w-full items-center justify-between gap-2"
                 >
                   <h2 className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-[#111827]">
@@ -1047,20 +862,14 @@ export default function EppDeliveriesPage() {
                     {loadingCurrentEpps ? (
                       <Loader2 className="h-3 w-3 animate-spin text-gray-400" />
                     ) : (
-                      <span className={cn(
-                        'ml-1 rounded-full px-2 py-0.5 text-xs font-black',
-                        workerCurrentEpps.length > 0
-                          ? 'bg-[#1E93AB]/10 text-[#1E93AB]'
-                          : 'bg-gray-100 text-gray-500'
+                      <span className={cn('ml-1 rounded-full px-2 py-0.5 text-xs font-black',
+                        workerCurrentEpps.length > 0 ? 'bg-[#1E93AB]/10 text-[#1E93AB]' : 'bg-gray-100 text-gray-500'
                       )}>
-                        {workerCurrentEpps.filter((epp) => epp.status === 'ACTIVO').length} activos / {workerCurrentEpps.length} total
+                        {workerCurrentEpps.filter((e) => e.status === 'ACTIVO').length} activos / {workerCurrentEpps.length} total
                       </span>
                     )}
                   </h2>
-                  {showCurrentEpps
-                    ? <ChevronUp className="h-4 w-4 flex-shrink-0 text-gray-400" />
-                    : <ChevronDown className="h-4 w-4 flex-shrink-0 text-gray-400" />
-                  }
+                  {showCurrentEpps ? <ChevronUp className="h-4 w-4 flex-shrink-0 text-gray-400" /> : <ChevronDown className="h-4 w-4 flex-shrink-0 text-gray-400" />}
                 </button>
 
                 {showCurrentEpps && (
@@ -1071,17 +880,14 @@ export default function EppDeliveriesPage() {
                         Cargando EPPs del trabajador...
                       </div>
                     ) : workerCurrentEpps.length === 0 ? (
-                      <p className="italic text-sm text-gray-400">
-                        Este trabajador no tiene EPPs asignados actualmente.
-                      </p>
+                      <p className="italic text-sm text-gray-400">Este trabajador no tiene EPPs asignados actualmente.</p>
                     ) : (
                       <div className={cn('grid grid-cols-1 gap-2', !showAllCurrentEpps && workerCurrentEpps.length > 4 ? 'max-h-[300px] overflow-y-auto pr-1' : '')}>
                         {workerCurrentEpps.map((epp, index) => (
                           <React.Fragment key={epp.id}>
                             {(index === 0 || workerCurrentEpps[index - 1]?.status !== epp.status) && (
                               <div className="flex items-center gap-2 pt-1">
-                                <span className={cn(
-                                  'rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-widest',
+                                <span className={cn('rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-widest',
                                   epp.status === 'ACTIVO' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                                 )}>
                                   {epp.status === 'ACTIVO' ? 'Activos' : 'De baja'}
@@ -1091,93 +897,129 @@ export default function EppDeliveriesPage() {
                                 </span>
                               </div>
                             )}
-                          <div
-                            key={epp.id}
-                            className={cn(
+                            <div className={cn(
                               'grid grid-cols-1 gap-3 rounded-md border px-3 py-2 text-sm md:grid-cols-[1fr_auto_auto_auto_auto_auto]',
-                              epp.status === 'ACTIVO'
-                                ? 'border-[#DCDCDC] bg-[#F3F2EC]'
-                                : 'border-red-200 bg-red-50'
-                            )}
-                          >
-                            <div className="flex min-w-0 items-center gap-2">
-                              <HardHat className="h-4 w-4 flex-shrink-0 text-[#1E93AB]" />
-                              <div className="min-w-0">
-                                <p className="font-bold leading-tight text-[#134686]">{epp.epp_name}</p>
-                                <p className="text-xs leading-tight text-gray-500">
-                                  {[epp.body_zone, epp.size ? `Talla ${epp.size}` : null, epp.certification].filter(Boolean).join(' · ')}
-                                </p>
-                              </div>
-                            </div>
-                            <span className="text-xs font-bold text-gray-600">{epp.assigned_date}</span>
-                            {isAdmin ? (
-                              <button
-                                type="button"
-                                onClick={() => toggleAssignmentStatus(epp)}
-                                className={cn(
-                                  'w-fit rounded-md px-2 py-1 text-[10px] font-black transition',
-                                  epp.status === 'ACTIVO'
-                                    ? 'bg-green-100 text-green-700 hover:bg-red-100 hover:text-red-700'
-                                    : 'bg-red-100 text-red-700 hover:bg-green-100 hover:text-green-700'
-                                )}
-                                title={epp.status === 'ACTIVO' ? 'Click para dar de baja' : 'Click para reactivar'}
-                              >
-                                {epp.status === 'ACTIVO' ? 'ACTIVO' : 'BAJA'}
-                              </button>
-                            ) : (
-                              <span className={cn('w-fit rounded-full px-2 py-1 text-xs font-black', epp.status === 'ACTIVO' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700')}>
-                                {epp.status === 'ACTIVO' ? 'ACTIVO' : 'BAJA'}
-                              </span>
-                            )}
-                            <span className={cn(
-                              'w-fit rounded-full px-2 py-1 text-xs font-black',
-                              epp.current_condition === 'MALO'
-                                ? 'bg-red-100 text-red-700'
-                                : epp.current_condition === 'REGULAR'
-                                  ? 'bg-amber-100 text-amber-700'
-                                  : 'bg-[#1E93AB]/10 text-[#1E93AB]'
+                              epp.status === 'ACTIVO' ? 'border-[#DCDCDC] bg-[#F3F2EC]' : 'border-red-200 bg-red-50'
                             )}>
-                              {epp.current_condition || 'BUENO'}
-                            </span>
-                            <span className="text-right text-xs font-black text-[#134686]">{formatMoney(epp.unit_price)}</span>
-                            {isAdmin && (
-                              <div className="flex gap-1 justify-end">
-                                <button
-                                  type="button"
-                                  onClick={() => setEditingAssignment(epp)}
-                                  className="rounded-md border border-[#DCDCDC] bg-white p-1 text-[#1E93AB] hover:bg-[#1E93AB]/10"
-                                  title="Editar"
-                                >
-                                  <Pencil className="h-3 w-3" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => confirmDeleteAssignment(epp)}
-                                  className="rounded-md border border-[#DCDCDC] bg-white p-1 text-red-500 hover:bg-red-50"
-                                  title="Eliminar"
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </button>
+                              <div className="flex min-w-0 items-center gap-2">
+                                <HardHat className="h-4 w-4 flex-shrink-0 text-[#1E93AB]" />
+                                <div className="min-w-0">
+                                  <p className="font-bold leading-tight text-[#134686]">{epp.epp_name}</p>
+                                  <p className="text-xs leading-tight text-gray-500">
+                                    {[epp.body_zone, epp.size ? `Talla ${epp.size}` : null, epp.certification].filter(Boolean).join(' · ')}
+                                  </p>
+                                </div>
                               </div>
-                            )}
-                          </div>
+                              <span className="text-xs font-bold text-gray-600">{epp.assigned_date}</span>
+                              {isAdmin ? (
+                                <button type="button" onClick={() => toggleAssignmentStatus(epp)}
+                                  className={cn('w-fit rounded-md px-2 py-1 text-[10px] font-black transition',
+                                    epp.status === 'ACTIVO'
+                                      ? 'bg-green-100 text-green-700 hover:bg-red-100 hover:text-red-700'
+                                      : 'bg-red-100 text-red-700 hover:bg-green-100 hover:text-green-700'
+                                  )}
+                                  title={epp.status === 'ACTIVO' ? 'Click para dar de baja' : 'Click para reactivar'}
+                                >
+                                  {epp.status === 'ACTIVO' ? 'ACTIVO' : 'BAJA'}
+                                </button>
+                              ) : (
+                                <span className={cn('w-fit rounded-full px-2 py-1 text-xs font-black',
+                                  epp.status === 'ACTIVO' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                )}>
+                                  {epp.status === 'ACTIVO' ? 'ACTIVO' : 'BAJA'}
+                                </span>
+                              )}
+                              <span className={cn('w-fit rounded-full px-2 py-1 text-xs font-black',
+                                epp.current_condition === 'MALO' ? 'bg-red-100 text-red-700'
+                                  : epp.current_condition === 'REGULAR' ? 'bg-amber-100 text-amber-700'
+                                  : 'bg-[#1E93AB]/10 text-[#1E93AB]'
+                              )}>
+                                {epp.current_condition || 'BUENO'}
+                              </span>
+                              <span className="text-right text-xs font-black text-[#134686]">{formatMoney(epp.unit_price)}</span>
+                              {isAdmin && (
+                                <div className="flex gap-1 justify-end">
+                                  <button type="button" onClick={() => setEditingAssignment(epp)}
+                                    className="rounded-md border border-[#DCDCDC] bg-white p-1 text-[#1E93AB] hover:bg-[#1E93AB]/10" title="Editar">
+                                    <Pencil className="h-3 w-3" />
+                                  </button>
+                                  <button type="button" onClick={() => confirmDeleteAssignment(epp)}
+                                    className="rounded-md border border-[#DCDCDC] bg-white p-1 text-red-500 hover:bg-red-50" title="Eliminar">
+                                    <Trash2 className="h-3 w-3" />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
                           </React.Fragment>
                         ))}
+                      </div>
+                    )}
+                    {!loadingCurrentEpps && workerCurrentEpps.length > 4 && (
+                      <button type="button" onClick={() => setShowAllCurrentEpps((v) => !v)}
+                        className="mt-2 text-xs font-black text-[#1E93AB] hover:text-[#134686]">
+                        {showAllCurrentEpps ? 'Ver menos' : 'Ver todos'}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </Panel>
+            )}
+          </div>
+
+          {/* ── COLUMNA DERECHA ── */}
+          <div className="space-y-3">
+            {/* Panel: Resumen */}
+            <Panel className="bg-[#134686] text-white !p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-[#FFB26B]">Resumen</p>
+                  <h2 className="mt-0.5 truncate text-sm font-bold">{selectedWorker?.full_name || 'Sin trabajador'}</h2>
+                </div>
+                <PackageCheck className="h-6 w-6 flex-shrink-0 text-[#FF7F11]" />
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-1.5">
+                <div className="rounded-md border border-white/10 bg-white/5 p-1.5">
+                  <p className="text-[10px] text-gray-300">Items entrega</p>
+                  <p className="mt-0.5 text-sm font-black">{items.length}</p>
+                </div>
+                <div className="rounded-md border border-white/10 bg-white/5 p-1.5">
+                  <p className="text-[10px] text-gray-300">Total entrega</p>
+                  <p className="mt-0.5 text-sm font-black truncate">S/ {totalEstimated.toFixed(2)}</p>
+                </div>
+                <div className="rounded-md border border-white/10 bg-white/5 p-1.5">
+                  <p className="text-[10px] text-gray-300">Firmas EPP</p>
+                  <p className="mt-0.5 text-sm font-black">{signedItems}/{items.length}</p>
+                </div>
+                <div className="rounded-md border border-white/10 bg-white/5 p-1.5 overflow-hidden">
+                  <p className="text-[10px] text-gray-300">Total EPPs activos</p>
+                  <p className="mt-0.5 truncate text-sm font-black">
+                    S/ {workerCurrentEpps.filter(e => e.status === 'ACTIVO').reduce((s, e) => s + (e.unit_price ?? 0), 0).toFixed(2)}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-2 space-y-1 text-xs text-gray-200">
+                <div className="flex justify-between gap-3">
+                  <span className="shrink-0">Fecha</span>
+                  <strong className="truncate">{deliveryDate}</strong>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="shrink-0">Responsable</span>
                   <strong className="truncate">{deliveredBy}</strong>
                 </div>
-                <div className="flex justify-between gap-3 min-w-0">
+                <div className="flex justify-between gap-3">
                   <span className="shrink-0">Estado</span>
                   <StatusBadge
-                      status={getDeliveryStatus({
-                        status: editingDeliveryId ? editingStatus : 'BORRADOR',
-                        delivered_by_signature_url: responsibleSignatureUrl,
-                        epp_delivery_items: items.map((item) => ({ worker_signature_url: item.workerSignatureUrl })),
-                      })}
-                    />
+                    status={getDeliveryStatus({
+                      status: editingDeliveryId ? editingStatus : 'BORRADOR',
+                      delivered_by_signature_url: responsibleSignatureUrl,
+                      epp_delivery_items: items.map((item) => ({ worker_signature_url: item.workerSignatureUrl })),
+                    })}
+                  />
                 </div>
               </div>
             </Panel>
 
+            {/* Panel: Historial de entregas */}
             <Panel>
               <h2 className="mb-2 text-sm font-black uppercase tracking-widest text-[#134686]">Historial de entregas</h2>
               {recentDeliveries.length === 0 ? (
@@ -1195,10 +1037,7 @@ export default function EppDeliveriesPage() {
                       </div>
                       <div className="mt-2 flex items-center justify-between gap-2 text-xs text-gray-500">
                         <span>{delivery.delivery_date} · {delivery.epp_delivery_items?.[0]?.count ?? 0} EPP</span>
-                        <button
-                          type="button"
-                          onClick={() => loadDeliveryForEdit(delivery.id)}
-                          disabled={saving}
+                        <button type="button" onClick={() => loadDeliveryForEdit(delivery.id)} disabled={saving}
                           className="inline-flex items-center gap-1 rounded-md border border-[#DCDCDC] bg-white px-2 py-1 font-black text-[#134686] transition hover:border-[#1E93AB] hover:text-[#1E93AB] disabled:opacity-50"
                         >
                           <Pencil className="h-3 w-3" />
@@ -1213,12 +1052,14 @@ export default function EppDeliveriesPage() {
           </div>
         </div>
       </div>
+
       <SignatureDialog
         open={signatureTarget !== null}
         onClose={() => setSignatureTarget(null)}
         onSave={saveSignature}
         title={signatureTarget?.title || ''}
       />
+
       {editingAssignment && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
@@ -1226,17 +1067,14 @@ export default function EppDeliveriesPage() {
             <div className="mb-3 space-y-4">
               <div>
                 <label className="text-xs font-bold text-gray-500">Talla</label>
-                <input
-                  type="text"
-                  className={fieldClass}
+                <input type="text" className={fieldClass}
                   value={editingAssignment.size || ''}
                   onChange={(e) => setEditingAssignment({ ...editingAssignment, size: e.target.value })}
                 />
               </div>
               <div>
                 <label className="text-xs font-bold text-gray-500">Condición actual</label>
-                <select
-                  className={fieldClass}
+                <select className={fieldClass}
                   value={editingAssignment.current_condition || 'BUENO'}
                   onChange={(e) => setEditingAssignment({ ...editingAssignment, current_condition: e.target.value })}
                 >
@@ -1248,24 +1086,18 @@ export default function EppDeliveriesPage() {
               </div>
               <div>
                 <label className="text-xs font-bold text-gray-500">Observación</label>
-                <textarea
-                  className={fieldClass}
-                  rows={3}
+                <textarea className={fieldClass} rows={3}
                   value={editingAssignment.observation || ''}
                   onChange={(e) => setEditingAssignment({ ...editingAssignment, observation: e.target.value })}
                 />
               </div>
             </div>
             <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setEditingAssignment(null)}
-                className="rounded-md border border-[#DCDCDC] bg-white px-4 py-2 text-sm font-bold text-gray-600 transition hover:bg-gray-50"
-              >
+              <button type="button" onClick={() => setEditingAssignment(null)}
+                className="rounded-md border border-[#DCDCDC] bg-white px-4 py-2 text-sm font-bold text-gray-600 transition hover:bg-gray-50">
                 Cancelar
               </button>
-              <button
-                type="button"
+              <button type="button"
                 onClick={() => saveAssignmentEdit(editingAssignment.id, {
                   size: editingAssignment.size,
                   current_condition: editingAssignment.current_condition,

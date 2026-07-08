@@ -1,8 +1,11 @@
 'use client';
 
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import IndustrialLayout from '@/components/layout/IndustrialLayout';
 import { SignatureDialog } from '@/components/common/SignatureDialog';
+import { supabase } from '@/lib/supabase';
+import { useFeedback } from '@/components/common/FeedbackUI';
+import { uploadInspectionPhoto } from '@/services/storageService';
 import { cn } from '@/lib/utils';
 import {
   AlertTriangle,
@@ -37,6 +40,12 @@ type WarehouseItem = {
   dueDate: string;
   status: 'PENDIENTE' | 'EN_PROCESO' | 'CERRADO';
   photoName?: string;
+  photoUrl?: string;
+  photoPath?: string;
+  correctedPhotoName?: string;
+  correctedPhotoUrl?: string;
+  correctedPhotoPath?: string;
+  hazardId?: string;
 };
 
 const fieldClass =
@@ -49,8 +58,6 @@ const inspectionTypes: { value: InspectionType; label: string }[] = [
   { value: 'NO_PLANEADA', label: 'No planeada' },
   { value: 'OTRO', label: 'Otro' },
 ];
-
-const areaTypes = ['Almacenes', 'Molino', 'Maestranza', 'Quemador', 'Chancado', 'Mantenimiento', 'Operaciones', 'Otro'];
 
 const initialItems: WarehouseItem[] = [];
 
@@ -101,6 +108,7 @@ function StatusPill({ item }: { item: WarehouseItem }) {
 }
 
 export default function WarehouseInspectionsPage() {
+  const { showToast } = useFeedback();
   const [inspectionType, setInspectionType] = useState<InspectionType>('PLANEADA_MENSUAL');
   const [inspectionDate, setInspectionDate] = useState(new Date().toISOString().slice(0, 10));
   const [clientName, setClientName] = useState('MINERA INMACULADA CONCEPCION Y MILAGROSA E.I.R.L');
@@ -109,29 +117,104 @@ export default function WarehouseInspectionsPage() {
   const [inspectedAreas, setInspectedAreas] = useState('Almacenes');
   const [specificZone, setSpecificZone] = useState('Almacen principal');
   const [areaResponsible, setAreaResponsible] = useState('Responsable de almacen');
-  const [objective, setObjective] = useState('Verificar el cumplimiento de estandares SSOMA, orden, limpieza y control operacional en almacenes.');
+  const [objective, setObjective] = useState('Verificar el cumplimiento de estándares SSOMA, orden, limpieza y control operacional en almacenes.');
   const [inspectorName, setInspectorName] = useState('Luis Campos');
+  const [areas, setAreas] = useState<any[]>([]);
+  const [hazards, setHazards] = useState<any[]>([]);
+  const [newAreaName, setNewAreaName] = useState('');
   const [items, setItems] = useState<WarehouseItem[]>(initialItems);
   const [selectedItemId, setSelectedItemId] = useState(initialItems[0]?.id ?? '');
   const [signatureTarget, setSignatureTarget] = useState<SignatureTarget>(null);
   const [inspectorSignatureUrl, setInspectorSignatureUrl] = useState('');
   const [responsibleSignatureUrl, setResponsibleSignatureUrl] = useState('');
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [isAnalyzingAi, setIsAnalyzingAi] = useState(false);
+  const [photoTarget, setPhotoTarget] = useState<'initial' | 'corrected'>('initial');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const selectedItem = items.find((item) => item.id === selectedItemId) ?? items[0];
   const openCount = useMemo(() => items.filter((item) => item.status !== 'CERRADO').length, [items]);
   const criticalCount = useMemo(() => items.filter((item) => item.riskLevel === 'A' && item.status !== 'CERRADO').length, [items]);
-  const photoCount = useMemo(() => items.filter((item) => item.photoName).length, [items]);
+  const photoCount = useMemo(
+    () => items.reduce((count, item) => count + (item.photoName ? 1 : 0) + (item.correctedPhotoName ? 1 : 0), 0),
+    [items]
+  );
+
+  useEffect(() => {
+    async function loadMetadata() {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: profile } = user
+        ? await supabase.from('profiles').select('client_id, full_name').eq('id', user.id).maybeSingle()
+        : { data: null };
+
+      if (profile?.full_name) setInspectorName(profile.full_name);
+
+      const [areasRes, hazardsRes, clientRes] = await Promise.all([
+        supabase.from('areas').select('*').order('name'),
+        supabase.from('iperc_hazards').select('*').order('code'),
+        profile?.client_id
+          ? supabase.from('clients').select('*').eq('id', profile.client_id).maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+      ]);
+
+      if (areasRes.data) {
+        setAreas(areasRes.data);
+        const firstArea = areasRes.data[0]?.name;
+        if (firstArea) {
+          setInspectedAreas(firstArea);
+          setSpecificZone(firstArea);
+        }
+      }
+
+      if (hazardsRes.data) setHazards(hazardsRes.data);
+
+      const client = clientRes.data as any;
+      if (client) {
+        setClientName(client.legal_name ?? client.name ?? client.business_name ?? clientName);
+        setRuc(client.ruc ?? ruc);
+        setProject(client.project ?? client.address ?? project);
+      }
+    }
+
+    loadMetadata();
+  }, []);
 
   function updateItem(id: string, patch: Partial<WarehouseItem>) {
     setItems((current) => current.map((item) => (item.id === id ? { ...item, ...patch } : item)));
   }
 
+  async function addArea() {
+    const name = newAreaName.trim().toUpperCase();
+    if (!name) return;
+
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data: profile } = user
+      ? await supabase.from('profiles').select('client_id').eq('id', user.id).maybeSingle()
+      : { data: null };
+
+    const { data, error } = await supabase
+      .from('areas')
+      .insert({ name, client_id: (profile as any)?.client_id ?? null })
+      .select()
+      .single();
+
+    if (error) {
+      showToast(error.message || 'No se pudo agregar el área.', 'error');
+      return;
+    }
+
+    setAreas((current) => [...current, data].sort((a, b) => a.name.localeCompare(b.name)));
+    setInspectedAreas(data.name);
+    setSpecificZone(data.name);
+    setNewAreaName('');
+    showToast('Área agregada.', 'success');
+  }
+
   function addItem() {
     const nextItem: WarehouseItem = {
       id: `warehouse-item-${Date.now()}`,
-      zone: 'Nueva zona / labor',
+      zone: specificZone.trim() || inspectedAreas || 'Nueva zona / labor',
       causeType: 'CI',
       riskLevel: 'C',
       observation: '',
@@ -177,6 +260,80 @@ export default function WarehouseInspectionsPage() {
     }
 
     updateItem(item.id, { correctiveAction: suggestion });
+  }
+
+  async function handlePhotoSelected(file?: File) {
+    if (!file || !selectedItem) return;
+
+    setIsUploadingPhoto(true);
+    try {
+      const result = await uploadInspectionPhoto(file, `warehouse-${selectedItem.id}`);
+      if (result.error || !result.url) throw new Error(result.error || 'No se pudo subir la foto.');
+
+      if (photoTarget === 'initial') {
+        updateItem(selectedItem.id, {
+          photoName: file.name,
+          photoUrl: result.url,
+          photoPath: result.path ?? undefined,
+        });
+      } else {
+        updateItem(selectedItem.id, {
+          correctedPhotoName: file.name,
+          correctedPhotoUrl: result.url,
+          correctedPhotoPath: result.path ?? undefined,
+          status: selectedItem.status === 'PENDIENTE' ? 'EN_PROCESO' : selectedItem.status,
+        });
+      }
+
+      showToast(photoTarget === 'initial' ? 'Foto inicial cargada.' : 'Foto de corrección cargada.', 'success');
+    } catch (error: any) {
+      showToast(error.message, 'error');
+    } finally {
+      setIsUploadingPhoto(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }
+
+  async function analyzeSelectedPhoto() {
+    if (!selectedItem?.photoUrl) {
+      showToast('Primero toma o sube la foto inicial del hallazgo.', 'error');
+      return;
+    }
+
+    setIsAnalyzingAi(true);
+    try {
+      const response = await fetch('/api/ai/suggest-finding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          photoUrl: selectedItem.photoUrl,
+          areaName: inspectedAreas,
+          subareaName: selectedItem.zone,
+          inspectionType,
+          existingObservation: selectedItem.observation,
+        }),
+      });
+
+      const suggestion = await response.json();
+      if (!response.ok) throw new Error(suggestion.error || 'No se pudo analizar la foto.');
+
+      const nextCause: CauseType =
+        suggestion.suggestedFindingType === 'ACTO_INSEGURO' ? 'AI'
+          : suggestion.suggestedFindingType === 'CONDICION_INSEGURA' ? 'CI'
+            : selectedItem.causeType;
+
+      updateItem(selectedItem.id, {
+        observation: suggestion.suggestedObservation || selectedItem.observation,
+        correctiveAction: suggestion.suggestedRecommendation || selectedItem.correctiveAction,
+        causeType: nextCause,
+        riskLevel: suggestion.suggestedSeverity || selectedItem.riskLevel,
+      });
+      showToast('IA completó la sugerencia del hallazgo.', 'success');
+    } catch (error: any) {
+      showToast(error.message, 'error');
+    } finally {
+      setIsAnalyzingAi(false);
+    }
   }
 
   function saveSignature(signatureUrl: string) {
@@ -243,7 +400,7 @@ export default function WarehouseInspectionsPage() {
               <Warehouse className="h-4 w-4" />
               ARGOS SST / Luis Campos
             </div>
-            <h1 className="mt-2 text-2xl font-bold text-[#134686]">Inspecciones por area</h1>
+            <h1 className="mt-2 text-2xl font-bold text-[#134686]">Inspecciones por área</h1>
           </div>
           <div className="flex flex-wrap gap-2">
             <button className="flex items-center gap-2 rounded-md border border-[#DCDCDC] bg-white px-4 py-2 text-sm font-bold text-[#134686] transition hover:border-[#1E93AB] hover:text-[#1E93AB]">
@@ -272,13 +429,13 @@ export default function WarehouseInspectionsPage() {
               Datos generales
             </h2>
             <span className="rounded-full bg-[#F3F2EC] px-3 py-1 text-xs font-bold text-[#134686]">
-              Formato inspeccion de areas
+              Formato inspección de áreas
             </span>
           </div>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
             <label className="space-y-1 lg:col-span-2">
-              <span className="text-xs font-bold text-gray-500">Razon social</span>
+              <span className="text-xs font-bold text-gray-500">Razón social</span>
               <input className={fieldClass} value={clientName} onChange={(event) => setClientName(event.target.value)} />
             </label>
             <label className="space-y-1">
@@ -298,7 +455,7 @@ export default function WarehouseInspectionsPage() {
               </div>
             </label>
             <label className="space-y-1">
-              <span className="text-xs font-bold text-gray-500">Tipo de inspeccion</span>
+              <span className="text-xs font-bold text-gray-500">Tipo de inspección</span>
               <select className={fieldClass} value={inspectionType} onChange={(event) => setInspectionType(event.target.value as InspectionType)}>
                 {inspectionTypes.map((item) => (
                   <option key={item.value} value={item.value}>
@@ -308,29 +465,53 @@ export default function WarehouseInspectionsPage() {
               </select>
             </label>
             <label className="space-y-1">
-              <span className="text-xs font-bold text-gray-500">Area / modulo</span>
-              <select className={fieldClass} value={inspectedAreas} onChange={(event) => setInspectedAreas(event.target.value)}>
-                {areaTypes.map((area) => (
-                  <option key={area} value={area}>
-                    {area}
-                  </option>
+              <span className="text-xs font-bold text-gray-500">Área / Módulo</span>
+              <select className={fieldClass} value={inspectedAreas} onChange={(event) => {
+                setInspectedAreas(event.target.value);
+                setSpecificZone(event.target.value);
+              }}>
+                {areas.map((area) => (
+                  <option key={area.id} value={area.name}>{area.name}</option>
                 ))}
+                {!areas.some((area) => area.name === inspectedAreas) && inspectedAreas && (
+                  <option value={inspectedAreas}>{inspectedAreas}</option>
+                )}
               </select>
+            </label>
+            <label className="space-y-1">
+              <span className="text-xs font-bold text-gray-500">Agregar área / módulo</span>
+              <div className="flex gap-2">
+                <input
+                  className={fieldClass}
+                  value={newAreaName}
+                  onChange={(event) => setNewAreaName(event.target.value.toUpperCase())}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      addArea();
+                    }
+                  }}
+                  placeholder="NUEVA ÁREA"
+                />
+                <button type="button" onClick={addArea} className="rounded-md bg-[#1E93AB] px-3 text-sm font-black text-white">
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
             </label>
             <label className="space-y-1">
               <span className="text-xs font-bold text-gray-500">Proyecto / unidad</span>
               <input className={fieldClass} value={project} onChange={(event) => setProject(event.target.value)} />
             </label>
             <label className="space-y-1">
-              <span className="text-xs font-bold text-gray-500">Zona especifica</span>
+              <span className="text-xs font-bold text-gray-500">Zona específica</span>
               <input className={fieldClass} value={specificZone} onChange={(event) => setSpecificZone(event.target.value)} />
             </label>
             <label className="space-y-1">
-              <span className="text-xs font-bold text-gray-500">Responsable del area</span>
+              <span className="text-xs font-bold text-gray-500">Responsable del área</span>
               <input className={fieldClass} value={areaResponsible} onChange={(event) => setAreaResponsible(event.target.value)} />
             </label>
             <label className="space-y-1 lg:col-span-4">
-              <span className="text-xs font-bold text-gray-500">Objetivo de la inspeccion</span>
+              <span className="text-xs font-bold text-gray-500">Objetivo de la inspección</span>
               <textarea className={cn(fieldClass, 'min-h-20 resize-y')} value={objective} onChange={(event) => setObjective(event.target.value)} />
             </label>
           </div>
@@ -349,7 +530,7 @@ export default function WarehouseInspectionsPage() {
                 className="flex items-center gap-1 rounded-md bg-[#FF7F11] px-3 py-2 text-xs font-black text-white transition hover:bg-[#E62727]"
               >
                 <Plus className="h-4 w-4" />
-                Agregar
+                Agregar hallazgo
               </button>
             </div>
             <div className="space-y-2">
@@ -381,7 +562,7 @@ export default function WarehouseInspectionsPage() {
               <div className="space-y-4">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                   <div>
-                    <p className="text-xs font-black uppercase tracking-widest text-[#1E93AB]">Detalle de inspeccion</p>
+                    <p className="text-xs font-black uppercase tracking-widest text-[#1E93AB]">Detalle de inspección</p>
                     <h2 className="mt-1 text-xl font-bold text-[#134686]">{selectedItem.zone}</h2>
                   </div>
                   <button
@@ -396,25 +577,44 @@ export default function WarehouseInspectionsPage() {
 
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
                   <label className="space-y-1 xl:col-span-2">
-                    <span className="text-xs font-bold text-gray-500">Seccion / zona / labor</span>
-                    <input className={fieldClass} value={selectedItem.zone} onChange={(event) => updateItem(selectedItem.id, { zone: event.target.value })} />
+                    <span className="text-xs font-bold text-gray-500">Sección / zona / labor</span>
+                    <select className={fieldClass} value={selectedItem.zone} onChange={(event) => updateItem(selectedItem.id, { zone: event.target.value })}>
+                      <option value={specificZone}>{specificZone || inspectedAreas}</option>
+                      {areas.map((area) => (
+                        <option key={area.id} value={area.name}>{area.name}</option>
+                      ))}
+                      {!areas.some((area) => area.name === selectedItem.zone) && selectedItem.zone && (
+                        <option value={selectedItem.zone}>{selectedItem.zone}</option>
+                      )}
+                    </select>
                   </label>
                   <label className="space-y-1">
                     <span className="text-xs font-bold text-gray-500">Causa</span>
                     <select className={fieldClass} value={selectedItem.causeType} onChange={(event) => updateItem(selectedItem.id, { causeType: event.target.value as CauseType })}>
                       <option value="AI">AI - Acto inseguro</option>
-                      <option value="CI">CI - Condicion insegura</option>
+                      <option value="CI">CI - Condición insegura</option>
                       <option value="AS">AS - Acto subestandar</option>
-                      <option value="CS">CS - Condicion subestandar</option>
+                      <option value="CS">CS - Condición subestándar</option>
                       <option value="NA">No aplica</option>
                     </select>
                   </label>
                   <label className="space-y-1">
-                    <span className="text-xs font-bold text-gray-500">Clasificacion</span>
+                    <span className="text-xs font-bold text-gray-500">Clasificación</span>
                     <select className={fieldClass} value={selectedItem.riskLevel} onChange={(event) => applyRiskLevel(selectedItem.id, event.target.value as RiskLevel)}>
                       <option value="A">A - 24 horas</option>
                       <option value="B">B - 72 horas</option>
                       <option value="C">C - menor</option>
+                    </select>
+                  </label>
+                  <label className="space-y-1 xl:col-span-4">
+                    <span className="text-xs font-bold text-gray-500">Peligro IPERC</span>
+                    <select className={fieldClass} value={selectedItem.hazardId ?? ''} onChange={(event) => updateItem(selectedItem.id, { hazardId: event.target.value || undefined })}>
+                      <option value="">Seleccionar peligro del IPERC</option>
+                      {hazards.map((hazard) => (
+                        <option key={hazard.id} value={hazard.id}>
+                          {hazard.code} - {hazard.description}
+                        </option>
+                      ))}
                     </select>
                   </label>
                 </div>
@@ -464,29 +664,53 @@ export default function WarehouseInspectionsPage() {
                     accept="image/*"
                     capture="environment"
                     className="hidden"
-                    onChange={(event) => {
-                      const file = event.target.files?.[0];
-                      updateItem(selectedItem.id, { photoName: file?.name });
-                    }}
+                    onChange={(event) => handlePhotoSelected(event.target.files?.[0])}
                   />
                   <button
                     type="button"
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={() => {
+                      setPhotoTarget('initial');
+                      fileInputRef.current?.click();
+                    }}
+                    disabled={isUploadingPhoto}
                     className={cn(
                       'flex items-center gap-2 rounded-md px-3 py-2 text-sm font-black transition',
                       selectedItem.photoName ? 'bg-green-100 text-green-700' : 'bg-[#F3F2EC] text-[#134686] hover:bg-[#DCDCDC]'
                     )}
                   >
                     {selectedItem.photoName ? <Camera className="h-4 w-4" /> : <ImagePlus className="h-4 w-4" />}
-                    {selectedItem.photoName ? selectedItem.photoName : 'Tomar/Subir foto'}
+                    {selectedItem.photoName ? `Inicio: ${selectedItem.photoName}` : 'Foto inicial'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={analyzeSelectedPhoto}
+                    disabled={isAnalyzingAi || !selectedItem.photoUrl}
+                    className="flex items-center gap-2 rounded-md bg-[#1E93AB] px-3 py-2 text-sm font-black text-white transition hover:bg-[#134686] disabled:cursor-not-allowed disabled:bg-gray-400"
+                  >
+                    <Bot className="h-4 w-4" />
+                    {isAnalyzingAi ? 'Analizando...' : 'Analizar con IA'}
                   </button>
                   <button
                     type="button"
                     onClick={() => suggestAction(selectedItem)}
-                    className="flex items-center gap-2 rounded-md bg-[#1E93AB] px-3 py-2 text-sm font-black text-white transition hover:bg-[#134686]"
+                    className="flex items-center gap-2 rounded-md border border-[#DCDCDC] bg-white px-3 py-2 text-sm font-black text-[#134686] transition hover:border-[#1E93AB]"
                   >
-                    <Bot className="h-4 w-4" />
-                    Sugerir texto IA
+                    Sugerir acción
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPhotoTarget('corrected');
+                      fileInputRef.current?.click();
+                    }}
+                    disabled={isUploadingPhoto}
+                    className={cn(
+                      'flex items-center gap-2 rounded-md px-3 py-2 text-sm font-black transition',
+                      selectedItem.correctedPhotoName ? 'bg-green-100 text-green-700' : 'bg-[#F3F2EC] text-[#134686] hover:bg-[#DCDCDC]'
+                    )}
+                  >
+                    {selectedItem.correctedPhotoName ? <Camera className="h-4 w-4" /> : <ImagePlus className="h-4 w-4" />}
+                    {selectedItem.correctedPhotoName ? `Corrección: ${selectedItem.correctedPhotoName}` : 'Foto corregida'}
                   </button>
                 </div>
               </div>
