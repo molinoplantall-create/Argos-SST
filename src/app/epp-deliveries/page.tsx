@@ -213,43 +213,67 @@ export default function EppDeliveriesPage() {
     `${item.name} ${item.body_zone} ${item.certification ?? ''}`.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // When search filter changes, reset selected EPP to the first visible result
-  useEffect(() => {
-    if (filteredCatalog.length > 0 && !filteredCatalog.some(item => item.id === selectedEppId)) {
-      setSelectedEppId(filteredCatalog[0].id);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm]);
-
   async function loadWorkerCurrentEpps(workerId: string) {
     setLoadingCurrentEpps(true);
     try {
-      const { data: assignmentRows } = await supabase
+      const { data: assignmentRows, error: assignmentError } = await supabase
         .from('worker_epp_assignments')
         .select('id, epp_id, epp_name, body_zone, size, certification, assigned_date, status, current_condition, delivery_item_id, epp_delivery_items(unit_price, currency)')
         .eq('worker_id', workerId)
         .order('assigned_date', { ascending: false });
 
-      if (assignmentRows) {
-        const normalized = assignmentRows.map((assignment: any) => {
-          const deliveredItem = Array.isArray(assignment.epp_delivery_items)
-            ? assignment.epp_delivery_items[0]
-            : assignment.epp_delivery_items;
-          const catalogItem = catalog.find((item) => item.id === assignment.epp_id || item.name === assignment.epp_name);
-          const deliveredPrice = Number(deliveredItem?.unit_price ?? assignment.unit_price ?? 0);
-          const catalogPrice = Number(catalogItem?.unit_price ?? 0);
-          return {
-            ...assignment,
-            unit_price: deliveredPrice > 0 ? deliveredPrice : catalogPrice,
-            currency: deliveredItem?.currency ?? catalogItem?.currency ?? assignment.currency ?? 'PEN',
-          };
-        }).sort((a: any, b: any) => {
-          if (a.status === 'ACTIVO' && b.status !== 'ACTIVO') return -1;
-          if (a.status !== 'ACTIVO' && b.status === 'ACTIVO') return 1;
-          return String(b.assigned_date ?? '').localeCompare(String(a.assigned_date ?? ''));
-        });
-        setWorkerCurrentEpps(normalized);
+      if (assignmentError) {
+        console.error('Error cargando assignments:', assignmentError.message);
       }
+
+      let rows = assignmentRows ?? [];
+
+      // Fallback: si no hay assignments, reconstruir desde epp_delivery_items
+      if (rows.length === 0) {
+        const { data: legacy } = await supabase
+          .from('epp_delivery_items')
+          .select('id, epp_id, epp_name, body_zone, size, certification, unit_price, currency, epp_deliveries!inner(worker_id, delivery_date, status, delivered_by_id)')
+          .eq('epp_deliveries.worker_id', workerId)
+          .order('epp_deliveries.delivery_date', { ascending: false });
+
+        if (legacy && legacy.length > 0) {
+          rows = legacy.map((a: any) => ({
+            id: a.id,
+            epp_id: a.epp_id,
+            epp_name: a.epp_name,
+            body_zone: a.body_zone,
+            size: a.size,
+            certification: a.certification,
+            unit_price: Number(a.unit_price ?? 0),
+            currency: a.currency ?? 'PEN',
+            assigned_date: a.epp_deliveries?.delivery_date ?? '',
+            status: 'ACTIVO',
+            current_condition: 'BUENO',
+            delivery_item_id: a.id,
+            epp_delivery_items: [] as { unit_price: any; currency: any }[],
+          }));
+        }
+      }
+
+      const normalized = rows.map((assignment: any) => {
+        const deliveredItem = Array.isArray(assignment.epp_delivery_items)
+          ? assignment.epp_delivery_items[0]
+          : assignment.epp_delivery_items;
+        const catalogItem = catalog.find((item) => item.id === assignment.epp_id || item.name === assignment.epp_name);
+        const deliveredPrice = Number(deliveredItem?.unit_price ?? 0);
+        const catalogPrice = Number(catalogItem?.unit_price ?? 0);
+        return {
+          ...assignment,
+          unit_price: deliveredPrice > 0 ? deliveredPrice : (assignment.unit_price > 0 ? assignment.unit_price : catalogPrice),
+          currency: deliveredItem?.currency ?? catalogItem?.currency ?? assignment.currency ?? 'PEN',
+        };
+      }).sort((a: any, b: any) => {
+        if (a.status === 'ACTIVO' && b.status !== 'ACTIVO') return -1;
+        if (a.status !== 'ACTIVO' && b.status === 'ACTIVO') return 1;
+        return String(b.assigned_date ?? '').localeCompare(String(a.assigned_date ?? ''));
+      });
+
+      setWorkerCurrentEpps(normalized);
     } finally {
       setLoadingCurrentEpps(false);
     }
@@ -478,6 +502,11 @@ export default function EppDeliveriesPage() {
       }));
       const { data: insertedItems, error: itemsError } = await supabase.from('epp_delivery_items').insert(deliveryItems).select();
       if (itemsError) throw itemsError;
+
+      // Upsert assignments — primero borrar los del delivery anterior si existe, luego insertar
+      if (editingDeliveryId) {
+        await supabase.from('worker_epp_assignments').delete().eq('delivery_id', delivery.id);
+      }
       const assignments = items.map((item, idx) => ({
         client_id: profile!.client_id,
         worker_id: selectedWorker.id,
@@ -493,7 +522,11 @@ export default function EppDeliveriesPage() {
         current_condition: 'BUENO'
       }));
       const { error: assignmentsError } = await supabase.from('worker_epp_assignments').insert(assignments);
-      if (assignmentsError) throw assignmentsError;
+      if (assignmentsError) {
+        // Mostrar el error exacto pero no bloquear el flujo — la entrega ya está guardada
+        showToast(`Entrega guardada. Aviso: ${assignmentsError.message}`, 'error');
+        console.error('worker_epp_assignments insert error:', assignmentsError);
+      }
       showToast(editingDeliveryId ? `Entrega actualizada como ${status}` : `Entrega guardada como ${status}`, 'success');
       await loadRecentDeliveries();
       await loadWorkerCurrentEpps(selectedWorker.id);
@@ -687,7 +720,17 @@ export default function EppDeliveriesPage() {
                     className={cn(fieldClass, 'pl-9')}
                     placeholder="Buscar en catalogo"
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onChange={(e) => {
+                      const term = e.target.value;
+                      setSearchTerm(term);
+                      // Si el EPP seleccionado no está en los resultados filtrados, seleccionar el primero visible
+                      const filtered = catalog.filter((item) =>
+                        `${item.name} ${item.body_zone} ${item.certification ?? ''}`.toLowerCase().includes(term.toLowerCase())
+                      );
+                      if (filtered.length > 0 && !filtered.some(item => item.id === selectedEppId)) {
+                        setSelectedEppId(filtered[0].id);
+                      }
+                    }}
                   />
                 </div>
               </div>
@@ -969,45 +1012,47 @@ export default function EppDeliveriesPage() {
           {/* ── COLUMNA DERECHA ── */}
           <div className="space-y-3">
             {/* Panel: Resumen */}
-            <Panel className="bg-[#134686] text-white !p-3">
+            <div className="rounded-lg bg-[#134686] text-white p-3 shadow-sm">
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <p className="text-[10px] font-black uppercase tracking-widest text-[#FFB26B]">Resumen</p>
-                  <h2 className="mt-0.5 truncate text-sm font-bold">{selectedWorker?.full_name || 'Sin trabajador'}</h2>
+                  <h2 className="mt-0.5 truncate text-sm font-bold leading-tight">{selectedWorker?.full_name || 'Sin trabajador'}</h2>
                 </div>
-                <PackageCheck className="h-6 w-6 flex-shrink-0 text-[#FF7F11]" />
+                <PackageCheck className="h-5 w-5 flex-shrink-0 text-[#FF7F11]" />
               </div>
+
               <div className="mt-2 grid grid-cols-2 gap-1.5">
-                <div className="rounded-md border border-white/10 bg-white/5 p-1.5">
-                  <p className="text-[10px] text-gray-300">Items entrega</p>
+                <div className="rounded border border-white/10 bg-white/5 px-2 py-1.5">
+                  <p className="text-[10px] text-gray-300 leading-none">Items entrega</p>
                   <p className="mt-0.5 text-sm font-black">{items.length}</p>
                 </div>
-                <div className="rounded-md border border-white/10 bg-white/5 p-1.5">
-                  <p className="text-[10px] text-gray-300">Total entrega</p>
+                <div className="rounded border border-white/10 bg-white/5 px-2 py-1.5">
+                  <p className="text-[10px] text-gray-300 leading-none">Total entrega</p>
                   <p className="mt-0.5 text-sm font-black truncate">S/ {totalEstimated.toFixed(2)}</p>
                 </div>
-                <div className="rounded-md border border-white/10 bg-white/5 p-1.5">
-                  <p className="text-[10px] text-gray-300">Firmas EPP</p>
+                <div className="rounded border border-white/10 bg-white/5 px-2 py-1.5">
+                  <p className="text-[10px] text-gray-300 leading-none">Firmas EPP</p>
                   <p className="mt-0.5 text-sm font-black">{signedItems}/{items.length}</p>
                 </div>
-                <div className="rounded-md border border-white/10 bg-white/5 p-1.5 overflow-hidden">
-                  <p className="text-[10px] text-gray-300">Total EPPs activos</p>
+                <div className="rounded border border-white/10 bg-white/5 px-2 py-1.5 overflow-hidden">
+                  <p className="text-[10px] text-gray-300 leading-none">Total EPPs activos</p>
                   <p className="mt-0.5 truncate text-sm font-black">
                     S/ {workerCurrentEpps.filter(e => e.status === 'ACTIVO').reduce((s, e) => s + (e.unit_price ?? 0), 0).toFixed(2)}
                   </p>
                 </div>
               </div>
-              <div className="mt-2 space-y-1 text-xs text-gray-200">
-                <div className="flex justify-between gap-3">
-                  <span className="shrink-0">Fecha</span>
+
+              <div className="mt-2 space-y-0.5 text-xs text-gray-200">
+                <div className="flex justify-between gap-2">
+                  <span className="shrink-0 text-gray-400">Fecha</span>
                   <strong className="truncate">{deliveryDate}</strong>
                 </div>
-                <div className="flex justify-between gap-3">
-                  <span className="shrink-0">Responsable</span>
+                <div className="flex justify-between gap-2">
+                  <span className="shrink-0 text-gray-400">Responsable</span>
                   <strong className="truncate">{deliveredBy}</strong>
                 </div>
-                <div className="flex justify-between gap-3">
-                  <span className="shrink-0">Estado</span>
+                <div className="flex justify-between gap-2">
+                  <span className="shrink-0 text-gray-400">Estado</span>
                   <StatusBadge
                     status={getDeliveryStatus({
                       status: editingDeliveryId ? editingStatus : 'BORRADOR',
@@ -1017,7 +1062,7 @@ export default function EppDeliveriesPage() {
                   />
                 </div>
               </div>
-            </Panel>
+            </div>
 
             {/* Panel: Historial de entregas */}
             <Panel>
