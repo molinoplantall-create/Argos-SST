@@ -794,7 +794,8 @@ function EppCatalogTab() {
   const { showToast, showConfirm } = useFeedback();
   const [catalog, setCatalog] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({ name: '', bodyZone: '', unit: 'Unidad', certification: '', unit_price: '' });
+  const [filterZone, setFilterZone] = useState('');
+  const [form, setForm] = useState({ name: '', bodyZone: '', unit: 'Unidad', certification: '', unit_price: '', brand: '' });
   const [adding, setAdding] = useState(false);
   const [editingItem, setEditingItem] = useState<any | null>(null);
   const [saving, setSaving] = useState(false);
@@ -810,6 +811,12 @@ function EppCatalogTab() {
 
   const toUpper = (v: string) => v.toUpperCase();
 
+  const filteredCatalog = filterZone
+    ? catalog.filter(item => item.body_zone === filterZone)
+    : catalog;
+
+  const zones = Array.from(new Set(catalog.map(i => i.body_zone).filter(Boolean))).sort();
+
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim() || !form.bodyZone.trim()) return;
@@ -822,11 +829,16 @@ function EppCatalogTab() {
       unit: form.unit.trim() || 'Unidad',
       certification: form.certification.trim().toUpperCase() || null,
       unit_price: form.unit_price ? parseFloat(form.unit_price) : null,
+      brand: form.brand.trim().toUpperCase() || null,
       client_id: (profile as any)?.client_id,
     });
     setAdding(false);
     if (error) { showToast('Error al agregar EPP.', 'error'); }
-    else { showToast('EPP agregado al catálogo.', 'success'); setForm({ name: '', bodyZone: '', unit: 'Unidad', certification: '', unit_price: '' }); loadCatalog(); }
+    else {
+      showToast('EPP agregado al catálogo.', 'success');
+      setForm({ name: '', bodyZone: '', unit: 'Unidad', certification: '', unit_price: '', brand: '' });
+      loadCatalog();
+    }
   };
 
   const handleSaveEdit = async () => {
@@ -838,6 +850,7 @@ function EppCatalogTab() {
       unit: editingItem.unit,
       certification: editingItem.certification?.toUpperCase() || null,
       unit_price: editingItem.unit_price ? parseFloat(editingItem.unit_price) : null,
+      brand: editingItem.brand?.toUpperCase() || null,
     }).eq('id', editingItem.id);
     setSaving(false);
     if (error) { showToast('Error al guardar.', 'error'); }
@@ -858,15 +871,19 @@ function EppCatalogTab() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-black text-[#134686]">Catálogo de EPP</h2>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <h2 className="text-lg font-black text-[#134686]">Catálogo de EPP</h2>
+        <p className="text-sm text-gray-500">{filteredCatalog.length} de {catalog.length} EPPs</p>
+      </div>
 
+      {/* Formulario agregar */}
       <form onSubmit={handleAdd} className="bg-white border border-[#DCDCDC] p-4 rounded-xl space-y-3">
         <p className="text-sm font-bold text-[#1a1a1a]">Agregar EPP al catálogo</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          <input required type="text" placeholder="Nombre EPP (Ej: CASCO)" value={form.name}
+          <input required type="text" placeholder="Nombre EPP (ej: CASCO DE SEGURIDAD)" value={form.name}
             onChange={e => setForm({...form, name: toUpper(e.target.value)})} className="input-std uppercase" />
           <select required value={form.bodyZone} onChange={e => setForm({...form, bodyZone: e.target.value})} className="input-std">
-            <option value="">Zona del Cuerpo</option>
+            <option value="">Zona del Cuerpo *</option>
             <option value="CABEZA">CABEZA</option>
             <option value="OJOS">OJOS</option>
             <option value="OIDOS">OÍDOS</option>
@@ -878,9 +895,11 @@ function EppCatalogTab() {
             <option value="CUERPO COMPLETO">CUERPO COMPLETO</option>
             <option value="OTROS">OTROS</option>
           </select>
-          <input type="text" placeholder="Unidad (Ej: Unidad, Par)" value={form.unit}
+          <input type="text" placeholder="Marca (ej: 3M, HONEYWELL)" value={form.brand}
+            onChange={e => setForm({...form, brand: toUpper(e.target.value)})} className="input-std uppercase" />
+          <input type="text" placeholder="Unidad (ej: Unidad, Par)" value={form.unit}
             onChange={e => setForm({...form, unit: e.target.value})} className="input-std" />
-          <input type="text" placeholder="Certificación (Ej: ANSI, NIOSH)" value={form.certification}
+          <input type="text" placeholder="Certificación (ej: ANSI Z89.1)" value={form.certification}
             onChange={e => setForm({...form, certification: toUpper(e.target.value)})} className="input-std uppercase" />
           <input type="number" min={0} step="0.01" placeholder="Precio unitario (S/)" value={form.unit_price}
             onChange={e => setForm({...form, unit_price: e.target.value})} className="input-std" />
@@ -891,16 +910,39 @@ function EppCatalogTab() {
         </button>
       </form>
 
+      {/* Filtro por zona */}
+      <div className="flex flex-wrap gap-2 items-center">
+        <span className="text-xs font-black text-gray-500 uppercase tracking-widest">Filtrar:</span>
+        <button
+          onClick={() => setFilterZone('')}
+          className={cn('px-3 py-1 rounded-full text-xs font-bold transition',
+            filterZone === '' ? 'bg-[#134686] text-white' : 'bg-[#F3F2EC] text-gray-600 hover:bg-[#DCDCDC]'
+          )}>
+          Todos ({catalog.length})
+        </button>
+        {zones.map(zone => (
+          <button
+            key={zone}
+            onClick={() => setFilterZone(zone === filterZone ? '' : zone)}
+            className={cn('px-3 py-1 rounded-full text-xs font-bold transition',
+              filterZone === zone ? 'bg-[#1E93AB] text-white' : 'bg-[#F3F2EC] text-gray-600 hover:bg-[#DCDCDC]'
+            )}>
+            {zone} ({catalog.filter(i => i.body_zone === zone).length})
+          </button>
+        ))}
+      </div>
+
+      {/* Lista */}
       {loading ? (
         <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 text-[#1E93AB] animate-spin" /></div>
-      ) : catalog.length === 0 ? (
+      ) : filteredCatalog.length === 0 ? (
         <div className="text-center py-10 text-gray-400">
           <Package className="w-10 h-10 mx-auto mb-2 opacity-30" />
-          <p className="text-sm">El catálogo está vacío.</p>
+          <p className="text-sm">{catalog.length === 0 ? 'El catálogo está vacío.' : 'No hay EPPs en esta zona.'}</p>
         </div>
       ) : (
         <div className="space-y-2">
-          {catalog.map((item) => (
+          {filteredCatalog.map((item) => (
             editingItem?.id === item.id ? (
               <div key={item.id} className="bg-white border-2 border-[#1E93AB] rounded-xl p-4 space-y-3">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
@@ -913,6 +955,8 @@ function EppCatalogTab() {
                     <option value="PIERNAS">PIERNAS</option><option value="PIES">PIES</option>
                     <option value="CUERPO COMPLETO">CUERPO COMPLETO</option><option value="OTROS">OTROS</option>
                   </select>
+                  <input type="text" value={editingItem.brand || ''} placeholder="Marca"
+                    onChange={e => setEditingItem({...editingItem, brand: toUpper(e.target.value)})} className="input-std uppercase" />
                   <input type="text" value={editingItem.unit || ''} placeholder="Unidad"
                     onChange={e => setEditingItem({...editingItem, unit: e.target.value})} className="input-std" />
                   <input type="text" value={editingItem.certification || ''} placeholder="Certificación"
@@ -924,18 +968,23 @@ function EppCatalogTab() {
                   <button onClick={() => setEditingItem(null)} className="px-3 py-1.5 border border-[#DCDCDC] rounded-lg text-sm font-bold text-gray-600 hover:bg-gray-50">Cancelar</button>
                   <button onClick={handleSaveEdit} disabled={saving}
                     className="px-3 py-1.5 bg-[#1E93AB] text-white rounded-lg text-sm font-bold hover:bg-[#167082] disabled:opacity-50 flex items-center gap-1">
-                    {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : null} Guardar
+                    {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />} Guardar
                   </button>
                 </div>
               </div>
             ) : (
               <div key={item.id} className="flex items-center justify-between bg-white border border-[#DCDCDC] rounded-xl px-4 py-3 hover:border-[#1E93AB]/40 transition-colors">
                 <div className="min-w-0 flex-1">
-                  <p className="font-black text-[#1a1a1a] text-sm">{item.name}</p>
-                  <p className="text-xs text-gray-500">
-                    {item.body_zone} | {item.unit}
-                    {item.certification && ` | ${item.certification}`}
-                    {item.unit_price != null && ` | S/ ${Number(item.unit_price).toFixed(2)}`}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-black text-[#1a1a1a] text-sm">{item.name}</p>
+                    <span className="rounded-full bg-[#1E93AB]/10 px-2 py-0.5 text-[10px] font-black text-[#1E93AB]">{item.body_zone}</span>
+                    {item.brand && <span className="rounded-full bg-[#F3F2EC] px-2 py-0.5 text-[10px] font-bold text-gray-600">{item.brand}</span>}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {item.unit}
+                    {item.certification && ` · ${item.certification}`}
+                    {item.unit_price != null && ` · S/ ${Number(item.unit_price).toFixed(2)}`}
+                    {item.created_at && ` · Agregado: ${new Date(item.created_at).toLocaleDateString('es-PE')}`}
                   </p>
                 </div>
                 <div className="flex gap-2 shrink-0">
