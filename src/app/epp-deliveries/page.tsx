@@ -355,49 +355,20 @@ export default function EppDeliveriesPage() {
     }
   }
 
-  async function addItem() {
-    if (!selectedEpp || !selectedWorker) {
-      if (!selectedWorker) showToast('Selecciona un trabajador primero.', 'error');
-      return;
-    }
-    const newItem: DeliveryItem = {
-      ...selectedEpp,
-      quantity,
-      size: size.trim() || undefined,
-      certification: certification.trim() || undefined,
-      unit_price: Number(unitPrice) || 0,
-      currency: selectedEpp.currency ?? 'PEN',
-      observation: observation.trim() || undefined,
-    };
-
-    // Guardar inmediatamente en worker_epp_assignments
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const { data: profile } = await supabase.from('profiles').select('client_id').eq('id', user!.id).single();
-      const { error } = await supabase.from('worker_epp_assignments').insert({
-        client_id: (profile as any)?.client_id,
-        worker_id: selectedWorker.id,
-        epp_id: selectedEpp.id,
-        epp_name: selectedEpp.name,
-        body_zone: selectedEpp.body_zone,
-        size: newItem.size || null,
-        certification: newItem.certification || null,
-        assigned_date: deliveryDate,
-        status: 'ACTIVO',
-        current_condition: 'BUENO',
-      });
-      if (error) {
-        showToast(`Error al agregar EPP: ${error.message}`, 'error');
-        return;
-      }
-      // Refrescar panel EPP Actuales
-      await loadWorkerCurrentEpps(selectedWorker.id);
-    } catch (e: any) {
-      showToast(e.message, 'error');
-      return;
-    }
-
-    setItems((current) => [...current, newItem]);
+  function addItem() {
+    if (!selectedEpp) return;
+    setItems((current) => [
+      ...current,
+      {
+        ...selectedEpp,
+        quantity,
+        size: size.trim() || undefined,
+        certification: certification.trim() || undefined,
+        unit_price: Number(unitPrice) || 0,
+        currency: selectedEpp.currency ?? 'PEN',
+        observation: observation.trim() || undefined,
+      },
+    ]);
     setQuantity(1);
     setSize('');
     setUnitPrice(Number(selectedEpp.unit_price ?? 0));
