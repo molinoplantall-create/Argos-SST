@@ -11,6 +11,7 @@ export interface IWorkerEppAssignment {
   eppName: string;
   bodyZone?: string;
   size?: string;
+  brand?: string;
   certification?: string;
   assignedDate: Date;
   status: WorkerEppStatus;

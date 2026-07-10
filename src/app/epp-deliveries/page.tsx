@@ -32,6 +32,7 @@ type CatalogItem = {
   name: string;
   body_zone: string;
   unit: string;
+  brand?: string;
   certification?: string;
   unit_price?: number;
   currency?: string;
@@ -51,6 +52,7 @@ type WorkerAssignment = {
   epp_name: string;
   body_zone?: string;
   size?: string;
+  brand?: string;
   certification?: string;
   assigned_date: string;
   status: string;
@@ -218,7 +220,7 @@ export default function EppDeliveriesPage() {
     try {
       const { data: assignmentRows, error: assignmentError } = await supabase
         .from('worker_epp_assignments')
-        .select('id, epp_id, epp_name, body_zone, size, certification, assigned_date, status, current_condition, delivery_item_id, epp_delivery_items(unit_price, currency)')
+        .select('id, epp_id, epp_name, body_zone, size, brand, certification, assigned_date, status, current_condition, delivery_item_id, epp_delivery_items(unit_price, currency, brand)')
         .eq('worker_id', workerId)
         .order('assigned_date', { ascending: false });
 
@@ -232,7 +234,7 @@ export default function EppDeliveriesPage() {
       if (rows.length === 0) {
         const { data: legacy } = await supabase
           .from('epp_delivery_items')
-          .select('id, epp_id, epp_name, body_zone, size, certification, unit_price, currency, epp_deliveries!inner(worker_id, delivery_date, status, delivered_by_id)')
+          .select('id, epp_id, epp_name, body_zone, size, brand, certification, unit_price, currency, epp_deliveries!inner(worker_id, delivery_date, status, delivered_by_id)')
           .eq('epp_deliveries.worker_id', workerId)
           .order('epp_deliveries.delivery_date', { ascending: false });
 
@@ -243,6 +245,7 @@ export default function EppDeliveriesPage() {
             epp_name: a.epp_name,
             body_zone: a.body_zone,
             size: a.size,
+            brand: a.brand ?? null,
             certification: a.certification,
             unit_price: Number(a.unit_price ?? 0),
             currency: a.currency ?? 'PEN',
@@ -250,7 +253,7 @@ export default function EppDeliveriesPage() {
             status: 'ACTIVO',
             current_condition: 'BUENO',
             delivery_item_id: a.id,
-            epp_delivery_items: [] as { unit_price: any; currency: any }[],
+            epp_delivery_items: [] as { unit_price: any; currency: any; brand: any }[],
           }));
         }
       }

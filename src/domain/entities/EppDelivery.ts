@@ -8,6 +8,7 @@ export interface IEppDeliveryItem {
   quantity: number;
   unit: string;
   size?: string;
+  brand?: string;
   certification?: string;
   unitPrice?: number;
   currency?: string;
