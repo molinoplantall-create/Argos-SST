@@ -506,29 +506,38 @@ export default function EppDeliveriesPage() {
       const { data: insertedItems, error: itemsError } = await supabase.from('epp_delivery_items').insert(deliveryItems).select();
       if (itemsError) throw itemsError;
 
-      // Upsert assignments — primero borrar los del delivery anterior si existe, luego insertar
-      if (editingDeliveryId) {
+      // Solo promover a EPP actuales los ítems que el trabajador ya firmó
+      const signedForAssignment = items.filter(item => item.workerSignatureUrl);
+      if (signedForAssignment.length > 0) {
+        if (editingDeliveryId) {
+          await supabase.from('worker_epp_assignments').delete().eq('delivery_id', delivery.id);
+        }
+        const assignments = signedForAssignment.map((item) => {
+          // Buscar el delivery_item_id correspondiente: mismo orden que items original
+          const originalIdx = items.indexOf(item);
+          return {
+            client_id: profile!.client_id,
+            worker_id: selectedWorker.id,
+            epp_id: item.id,
+            delivery_id: delivery.id,
+            delivery_item_id: insertedItems?.[originalIdx]?.id || null,
+            epp_name: item.name,
+            body_zone: item.body_zone,
+            size: item.size || null,
+            certification: item.certification || null,
+            assigned_date: deliveryDate,
+            status: 'ACTIVO',
+            current_condition: 'BUENO',
+          };
+        });
+        const { error: assignmentsError } = await supabase.from('worker_epp_assignments').insert(assignments);
+        if (assignmentsError) {
+          showToast(`Entrega guardada. Aviso: ${assignmentsError.message}`, 'error');
+          console.error('worker_epp_assignments insert error:', assignmentsError);
+        }
+      } else if (editingDeliveryId) {
+        // Borrador sin firmas: limpiar assignments previos del delivery
         await supabase.from('worker_epp_assignments').delete().eq('delivery_id', delivery.id);
-      }
-      const assignments = items.map((item, idx) => ({
-        client_id: profile!.client_id,
-        worker_id: selectedWorker.id,
-        epp_id: item.id,
-        delivery_id: delivery.id,
-        delivery_item_id: insertedItems?.[idx]?.id || null,
-        epp_name: item.name,
-        body_zone: item.body_zone,
-        size: item.size || null,
-        certification: item.certification || null,
-        assigned_date: deliveryDate,
-        status: 'ACTIVO',
-        current_condition: 'BUENO'
-      }));
-      const { error: assignmentsError } = await supabase.from('worker_epp_assignments').insert(assignments);
-      if (assignmentsError) {
-        // Mostrar el error exacto pero no bloquear el flujo — la entrega ya está guardada
-        showToast(`Entrega guardada. Aviso: ${assignmentsError.message}`, 'error');
-        console.error('worker_epp_assignments insert error:', assignmentsError);
       }
       showToast(editingDeliveryId ? `Entrega actualizada como ${status}` : `Entrega guardada como ${status}`, 'success');
       await loadRecentDeliveries();
