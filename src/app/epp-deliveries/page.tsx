@@ -1020,38 +1020,38 @@ export default function EppDeliveriesPage() {
           {/* ── COLUMNA DERECHA ── */}
           <div className="space-y-3">
             {/* Panel: Resumen */}
-            <div className="rounded-lg bg-[#134686] text-white p-3 shadow-sm">
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-[#FFB26B]">Resumen</p>
-                  <h2 className="mt-0.5 truncate text-sm font-bold leading-tight">{selectedWorker?.full_name || 'Sin trabajador'}</h2>
+            <Panel className="bg-[#134686] text-white">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-widest text-[#FFB26B]">Resumen</p>
+                  <h2 className="mt-2 text-lg font-bold">{selectedWorker?.full_name || 'Sin trabajador'}</h2>
                 </div>
-                <PackageCheck className="h-5 w-5 flex-shrink-0 text-[#FF7F11]" />
+                <PackageCheck className="h-8 w-8 flex-shrink-0 text-[#FF7F11]" />
               </div>
 
-              <div className="mt-2 grid grid-cols-2 gap-1.5">
-                <div className="rounded border border-white/10 bg-white/5 px-2 py-1.5">
-                  <p className="text-[10px] text-gray-300 leading-none">Items entrega</p>
-                  <p className="mt-0.5 text-sm font-black">{items.length}</p>
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                <div className="rounded-md border border-white/10 bg-white/5 p-3">
+                  <p className="text-xs text-gray-300">Items entrega</p>
+                  <p className="mt-1 text-2xl font-black">{items.length}</p>
                 </div>
-                <div className="rounded border border-white/10 bg-white/5 px-2 py-1.5">
-                  <p className="text-[10px] text-gray-300 leading-none">Total entrega</p>
-                  <p className="mt-0.5 text-sm font-black truncate">S/ {totalEstimated.toFixed(2)}</p>
+                <div className="rounded-md border border-white/10 bg-white/5 p-3">
+                  <p className="text-xs text-gray-300">Total entrega</p>
+                  <p className="mt-1 truncate text-2xl font-black">S/ {totalEstimated.toFixed(2)}</p>
                 </div>
-                <div className="rounded border border-white/10 bg-white/5 px-2 py-1.5">
-                  <p className="text-[10px] text-gray-300 leading-none">Firmas EPP</p>
-                  <p className="mt-0.5 text-sm font-black">{signedItems}/{items.length}</p>
+                <div className="rounded-md border border-white/10 bg-white/5 p-3">
+                  <p className="text-xs text-gray-300">Firmas EPP</p>
+                  <p className="mt-1 text-2xl font-black">{signedItems}/{items.length}</p>
                 </div>
-                <div className="rounded border border-white/10 bg-white/5 px-2 py-1.5 overflow-hidden">
-                  <p className="text-[10px] text-gray-300 leading-none">Total EPPs activos</p>
-                  <p className="mt-0.5 truncate text-sm font-black">
+                <div className="rounded-md border border-white/10 bg-white/5 p-3 overflow-hidden">
+                  <p className="text-xs text-gray-300">Total activos</p>
+                  <p className="mt-1 truncate text-2xl font-black">
                     S/ {workerCurrentEpps.filter(e => e.status === 'ACTIVO').reduce((s, e) => s + (e.unit_price ?? 0), 0).toFixed(2)}
                   </p>
                 </div>
               </div>
 
-              <div className="mt-2 space-y-0.5 text-xs text-gray-200">
-                <div className="flex justify-between gap-2">
+              <div className="mt-5 space-y-2 text-sm text-gray-200">
+                <div className="flex justify-between gap-2 border-t border-white/10 pt-2">
                   <span className="shrink-0 text-gray-400">Fecha</span>
                   <strong className="truncate">{deliveryDate}</strong>
                 </div>
@@ -1070,7 +1070,7 @@ export default function EppDeliveriesPage() {
                   />
                 </div>
               </div>
-            </div>
+            </Panel>
 
             {/* Panel: Historial de entregas */}
             <Panel>
