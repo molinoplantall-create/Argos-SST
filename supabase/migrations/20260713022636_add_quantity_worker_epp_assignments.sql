@@ -1,0 +1,1 @@
+ALTER TABLE worker_epp_assignments ADD COLUMN IF NOT EXISTS quantity INTEGER DEFAULT 1;
