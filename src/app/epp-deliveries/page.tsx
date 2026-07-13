@@ -786,36 +786,36 @@ export default function EppDeliveriesPage() {
                 <table className="w-full min-w-[1024px] text-left text-sm">
                   <thead>
                     <tr className="border-b border-[#DCDCDC] text-xs uppercase tracking-widest text-gray-500">
-                      <th className="pb-3">EPP</th>
-                      <th className="pb-3">Fecha</th>
-                      <th className="pb-3">Certificacion</th>
-                      <th className="pb-3 text-center">Cant.</th>
-                      <th className="pb-3">Talla</th>
-                      <th className="pb-3 text-right">Precio</th>
-                      <th className="pb-3">Obs.</th>
-                      <th className="pb-3">Firma trabajador</th>
-                      <th className="pb-3 text-right">Accion</th>
+                      <th className="px-2 pb-3">EPP</th>
+                      <th className="px-2 pb-3">Fecha</th>
+                      <th className="px-2 pb-3">Certificacion</th>
+                      <th className="px-2 pb-3 text-center">Cant.</th>
+                      <th className="px-2 pb-3">Talla</th>
+                      <th className="px-2 pb-3 text-right">Precio</th>
+                      <th className="px-2 pb-3">Obs.</th>
+                      <th className="px-2 pb-3">Firma trabajador</th>
+                      <th className="px-2 pb-3 text-right">Accion</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#E5E7EB]">
                     {items.map((item, index) => (
                       <tr key={`${item.id}-${index}`} className="align-middle">
-                        <td className="py-2 font-bold text-[#134686]">{item.name}</td>
-                        <td className="py-2 text-gray-600">{deliveryDate}</td>
-                        <td className="py-2">
+                        <td className="px-2 py-2 font-bold text-[#134686]">{item.name}</td>
+                        <td className="px-2 py-2 text-gray-600">{deliveryDate}</td>
+                        <td className="px-2 py-2">
                           <span className="inline-flex items-center gap-1 rounded-full bg-[#F3F4F6] px-2 py-1 text-xs font-bold text-gray-700">
                             <BadgeCheck className="h-3 w-3 text-[#1E93AB]" />
                             {item.certification ?? 'Pendiente'}
                           </span>
                         </td>
-                        <td className="py-2 text-center">
+                        <td className="px-2 py-2 text-center">
                           <input
                             type="number" min={1} value={item.quantity}
                             onChange={(e) => updateItem(index, { quantity: parseInt(e.target.value) || 1 })}
                             className="w-16 rounded border border-[#DCDCDC] px-2 py-1 text-sm outline-none focus:border-[#1E93AB]"
                           />
                         </td>
-                        <td className="py-2">
+                        <td className="px-2 py-2">
                           {(() => {
                             const availableSizes = (catalog.find(c => c.id === item.id) as any)?.available_sizes || [];
                             return availableSizes.length > 0 ? (
@@ -837,7 +837,7 @@ export default function EppDeliveriesPage() {
                             );
                           })()}
                         </td>
-                        <td className="py-2">
+                        <td className="px-2 py-2">
                           <div className="flex flex-col gap-1 items-end">
                             <div className="flex gap-1">
                               <select value={item.currency ?? 'PEN'} onChange={(e) => updateItem(index, { currency: e.target.value })}
@@ -855,12 +855,12 @@ export default function EppDeliveriesPage() {
                             </span>
                           </div>
                         </td>
-                        <td className="py-2">
+                        <td className="px-2 py-2">
                           <input type="text" value={item.observation ?? ''} onChange={(e) => updateItem(index, { observation: e.target.value })}
                             className="w-full min-w-[120px] rounded border border-[#DCDCDC] px-2 py-1 text-sm outline-none focus:border-[#1E93AB]"
                           />
                         </td>
-                        <td className="py-2">
+                        <td className="px-2 py-2">
                           {item.workerSignatureUrl ? (
                             <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-1 text-xs font-black text-green-700">
                               <FileSignature className="h-3 w-3" /> Firmado
@@ -874,7 +874,7 @@ export default function EppDeliveriesPage() {
                             </button>
                           )}
                         </td>
-                        <td className="py-2 text-right">
+                        <td className="px-2 py-2 text-right">
                           <button type="button" onClick={() => removeItem(index)}
                             className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition hover:bg-red-50 hover:text-red-600"
                             aria-label="Eliminar EPP"
