@@ -493,6 +493,7 @@ export default function EppDeliveriesPage() {
         epp_id: item.id,
         epp_name: item.name,
         body_zone: item.body_zone,
+        brand: item.brand || null,
         quantity: item.quantity,
         unit: item.unit,
         size: item.size || null,
@@ -518,6 +519,7 @@ export default function EppDeliveriesPage() {
         delivery_item_id: insertedItems?.[idx]?.id || null,
         epp_name: item.name,
         body_zone: item.body_zone,
+        brand: item.brand || null,
         size: item.size || null,
         certification: item.certification || null,
         assigned_date: deliveryDate,
@@ -789,6 +791,7 @@ export default function EppDeliveriesPage() {
                       <th className="pb-3">EPP</th>
                       <th className="pb-3">Fecha</th>
                       <th className="pb-3">Certificacion</th>
+                      <th className="pb-3">Marca</th>
                       <th className="pb-3 text-center">Cant.</th>
                       <th className="pb-3">Talla</th>
                       <th className="pb-3 text-right">Precio</th>
@@ -808,6 +811,7 @@ export default function EppDeliveriesPage() {
                             {item.certification ?? 'Pendiente'}
                           </span>
                         </td>
+                        <td className="py-2 text-xs text-gray-600">{item.brand ?? '-'}</td>
                         <td className="py-2 text-center">
                           <input
                             type="number" min={1} value={item.quantity}
@@ -886,7 +890,7 @@ export default function EppDeliveriesPage() {
                     ))}
                     {items.length === 0 && (
                       <tr>
-                        <td colSpan={9} className="py-8 text-center text-gray-400">
+                        <td colSpan={10} className="py-8 text-center text-gray-400">
                           Agrega EPPs desde el catálogo para este trabajador.
                         </td>
                       </tr>
@@ -952,7 +956,7 @@ export default function EppDeliveriesPage() {
                                 <div className="min-w-0">
                                   <p className="font-bold leading-tight text-[#134686]">{epp.epp_name}</p>
                                   <p className="text-xs leading-tight text-gray-500">
-                                    {[epp.body_zone, epp.size ? `Talla ${epp.size}` : null, epp.certification].filter(Boolean).join(' · ')}
+                                    {[epp.brand, epp.body_zone, epp.size ? `Talla ${epp.size}` : null, epp.certification].filter(Boolean).join(' · ')}
                                   </p>
                                 </div>
                               </div>
