@@ -447,13 +447,16 @@ export default function EppDeliveriesPage() {
     );
   }
 
-  function saveSignature(signatureUrl: string) {
-    if (signatureTarget?.type === 'worker') signItem(signatureTarget.itemIndex, signatureUrl);
+  async function saveSignature(signatureUrl: string) {
+    if (signatureTarget?.type === 'worker') {
+      signItem(signatureTarget.itemIndex, signatureUrl);
+      await saveDelivery('BORRADOR', { silent: true });
+    }
     if (signatureTarget?.type === 'responsible') setResponsibleSignatureUrl(signatureUrl);
     setSignatureTarget(null);
   }
 
-  async function saveDelivery(status: 'BORRADOR' | 'FIRMADO') {
+  async function saveDelivery(status: 'BORRADOR' | 'FIRMADO', options?: { silent?: boolean }) {
     if (!selectedWorker || items.length === 0) return null;
     setSaving(true);
     try {
@@ -484,6 +487,10 @@ export default function EppDeliveriesPage() {
           .from('epp_deliveries').insert(deliveryPayload).select().single();
         if (deliveryError) throw deliveryError;
         delivery = insertedDelivery;
+      }
+      if (options?.silent && !editingDeliveryId) {
+        setEditingDeliveryId(delivery.id);
+        setEditingDocumentCode(docCode);
       }
       const deliveryItems = items.map(item => ({
         delivery_id: delivery.id,
@@ -523,6 +530,7 @@ export default function EppDeliveriesPage() {
             size: item.size || null,
             certification: item.certification || null,
             assigned_date: deliveryDate,
+            quantity: item.quantity,
             status: 'ACTIVO',
             current_condition: 'BUENO',
           };
@@ -536,12 +544,18 @@ export default function EppDeliveriesPage() {
         // Borrador sin firmas: limpiar assignments previos del delivery
         await supabase.from('worker_epp_assignments').delete().eq('delivery_id', delivery.id);
       }
-      showToast(editingDeliveryId ? `Entrega actualizada como ${status}` : `Entrega guardada como ${status}`, 'success');
+      if (options?.silent) {
+        showToast('Firmado y guardado', 'success');
+      } else {
+        showToast(editingDeliveryId ? `Entrega actualizada como ${status}` : `Entrega guardada como ${status}`, 'success');
+      }
       await loadRecentDeliveries();
       await loadWorkerCurrentEpps(selectedWorker.id);
-      setItems([]);
-      setResponsibleSignatureUrl('');
-      clearEditingState();
+      if (!options?.silent) {
+        setItems([]);
+        setResponsibleSignatureUrl('');
+        clearEditingState();
+      }
       return delivery;
     } catch (e: any) {
       showToast(e.message, 'error');
