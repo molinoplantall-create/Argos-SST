@@ -1003,18 +1003,6 @@ export default function EppDeliveriesPage() {
                                 {epp.current_condition || 'BUENO'}
                               </span>
                               <span className="text-right text-xs font-black text-[#134686]">{formatMoney(epp.unit_price)}</span>
-                              {isAdmin && (
-                                <div className="flex gap-1 justify-end">
-                                  <button type="button" onClick={() => setEditingAssignment(epp)}
-                                    className="rounded-md border border-[#DCDCDC] bg-white p-1 text-[#1E93AB] hover:bg-[#1E93AB]/10" title="Editar">
-                                    <Pencil className="h-3 w-3" />
-                                  </button>
-                                  <button type="button" onClick={() => confirmDeleteAssignment(epp)}
-                                    className="rounded-md border border-[#DCDCDC] bg-white p-1 text-red-500 hover:bg-red-50" title="Eliminar">
-                                    <Trash2 className="h-3 w-3" />
-                                  </button>
-                                </div>
-                              )}
                             </div>
                           </React.Fragment>
                         ))}
