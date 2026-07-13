@@ -56,6 +56,7 @@ type WorkerAssignment = {
   brand?: string;
   certification?: string;
   assigned_date: string;
+  quantity?: number;
   status: string;
   current_condition?: string;
   unit_price?: number;
@@ -217,7 +218,7 @@ export default function EppDeliveriesPage() {
     try {
       const { data: assignmentRows, error: assignmentError } = await supabase
         .from('worker_epp_assignments')
-        .select('id, epp_id, epp_name, body_zone, size, brand, certification, assigned_date, status, current_condition, delivery_item_id, epp_delivery_items(unit_price, currency, brand)')
+        .select('id, epp_id, epp_name, body_zone, size, brand, certification, quantity, assigned_date, status, current_condition, delivery_item_id, epp_delivery_items(unit_price, currency, brand)')
         .eq('worker_id', workerId)
         .order('assigned_date', { ascending: false });
 
@@ -231,7 +232,7 @@ export default function EppDeliveriesPage() {
       if (rows.length === 0) {
         const { data: legacy } = await supabase
           .from('epp_delivery_items')
-          .select('id, epp_id, epp_name, body_zone, size, brand, certification, unit_price, currency, epp_deliveries!inner(worker_id, delivery_date, status, delivered_by_id)')
+          .select('id, epp_id, epp_name, body_zone, size, brand, certification, quantity, unit_price, currency, epp_deliveries!inner(worker_id, delivery_date, status, delivered_by_id)')
           .eq('epp_deliveries.worker_id', workerId)
           .order('epp_deliveries.delivery_date', { ascending: false });
 
@@ -244,6 +245,7 @@ export default function EppDeliveriesPage() {
             size: a.size,
             brand: a.brand ?? null,
             certification: a.certification,
+            quantity: a.quantity ?? 1,
             unit_price: Number(a.unit_price ?? 0),
             currency: a.currency ?? 'PEN',
             assigned_date: a.epp_deliveries?.delivery_date ?? '',
@@ -1073,7 +1075,7 @@ export default function EppDeliveriesPage() {
                               </div>
                             )}
                             <div className={cn(
-                              'grid grid-cols-1 gap-3 rounded-md border px-3 py-2 text-sm md:grid-cols-[1fr_auto_auto_auto_auto_auto]',
+                              'grid grid-cols-1 gap-3 rounded-md border px-3 py-2 text-sm md:grid-cols-[1fr_auto_auto_auto_auto_auto_auto]',
                               epp.status === 'ACTIVO' ? 'border-[#DCDCDC] bg-[#F3F2EC]' : 'border-red-200 bg-red-50'
                             )}>
                               <div className="flex min-w-0 items-center gap-2">
@@ -1081,10 +1083,16 @@ export default function EppDeliveriesPage() {
                                 <div className="min-w-0">
                                   <p className="font-bold leading-tight text-[#134686]">{epp.epp_name}</p>
                                   <p className="text-xs leading-tight text-gray-500">
-                                    {[epp.body_zone, epp.size ? `Talla ${epp.size}` : null, epp.certification].filter(Boolean).join(' · ')}
+                                    {[epp.body_zone, epp.certification].filter(Boolean).join(' · ')}
                                   </p>
                                 </div>
                               </div>
+                              <span className="text-xs font-bold text-gray-600">
+                                {epp.size ? `Talla ${epp.size}` : '—'}
+                              </span>
+                              <span className="text-xs font-bold text-gray-600">
+                                Cant. {epp.quantity ?? 1}
+                              </span>
                               <span className="text-xs font-bold text-gray-600">{epp.assigned_date}</span>
                               {isAdmin ? (
                                 <button type="button" onClick={() => toggleAssignmentStatus(epp)}
