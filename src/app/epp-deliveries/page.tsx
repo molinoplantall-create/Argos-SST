@@ -821,18 +821,23 @@ export default function EppDeliveriesPage() {
                           <input
                             type="number" min={1} value={item.quantity}
                             onChange={(e) => updateItem(index, { quantity: parseInt(e.target.value) || 1 })}
-                            className="w-16 rounded border border-[#DCDCDC] px-2 py-1 text-sm outline-none focus:border-[#1E93AB]"
+                            disabled={!!item.workerSignatureUrl}
+                            className="w-16 rounded border border-[#DCDCDC] px-2 py-1 text-sm outline-none focus:border-[#1E93AB] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
                           />
                         </td>
                         <td className="px-2 py-2">
                           {(() => {
                             const availableSizes = (catalog.find(c => c.id === item.id) as any)?.available_sizes || [];
+                            const locked = !!item.workerSignatureUrl;
                             return availableSizes.length > 0 ? (
                               <div className="flex flex-wrap gap-1">
                                 {availableSizes.map((s: string) => (
-                                  <button key={s} type="button" onClick={() => updateItem(index, { size: s })}
+                                  <button key={s} type="button"
+                                    onClick={() => !locked && updateItem(index, { size: s })}
+                                    disabled={locked}
                                     className={cn('rounded-md border px-2 py-1 text-xs font-bold',
-                                      item.size === s ? 'border-[#FF7F11] bg-[#FF7F11] text-white' : 'border-[#DCDCDC] bg-white text-gray-700 hover:border-[#1E93AB]'
+                                      locked ? 'border-[#DCDCDC] bg-gray-100 text-gray-400 cursor-not-allowed'
+                                        : item.size === s ? 'border-[#FF7F11] bg-[#FF7F11] text-white' : 'border-[#DCDCDC] bg-white text-gray-700 hover:border-[#1E93AB]'
                                     )}>
                                     {s}
                                   </button>
@@ -841,7 +846,8 @@ export default function EppDeliveriesPage() {
                             ) : (
                               <input type="text" placeholder="Ej: M, 42" value={item.size ?? ''}
                                 onChange={(e) => updateItem(index, { size: e.target.value })}
-                                className="w-20 rounded border border-[#DCDCDC] px-2 py-1 text-sm outline-none focus:border-[#1E93AB]"
+                                disabled={locked}
+                                className="w-20 rounded border border-[#DCDCDC] px-2 py-1 text-sm outline-none focus:border-[#1E93AB] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
                               />
                             );
                           })()}
@@ -850,13 +856,15 @@ export default function EppDeliveriesPage() {
                           <div className="flex flex-col gap-1 items-end">
                             <div className="flex gap-1">
                               <select value={item.currency ?? 'PEN'} onChange={(e) => updateItem(index, { currency: e.target.value })}
-                                className="w-12 rounded border border-[#DCDCDC] px-1 py-1 text-xs outline-none focus:border-[#1E93AB]">
+                                disabled={!!item.workerSignatureUrl}
+                                className="w-12 rounded border border-[#DCDCDC] px-1 py-1 text-xs outline-none focus:border-[#1E93AB] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed">
                                 <option value="PEN">S/</option>
                                 <option value="USD">$</option>
                               </select>
                               <input type="number" step="0.01" min="0" value={item.unit_price ?? 0}
                                 onChange={(e) => updateItem(index, { unit_price: parseFloat(e.target.value) || 0 })}
-                                className="w-20 rounded border border-[#DCDCDC] px-2 py-1 text-sm outline-none text-right focus:border-[#1E93AB]"
+                                disabled={!!item.workerSignatureUrl}
+                                className="w-20 rounded border border-[#DCDCDC] px-2 py-1 text-sm outline-none text-right focus:border-[#1E93AB] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
                               />
                             </div>
                             <span className="text-xs text-gray-500 font-bold">
@@ -866,7 +874,8 @@ export default function EppDeliveriesPage() {
                         </td>
                         <td className="px-2 py-2">
                           <input type="text" value={item.observation ?? ''} onChange={(e) => updateItem(index, { observation: e.target.value })}
-                            className="w-full min-w-[120px] rounded border border-[#DCDCDC] px-2 py-1 text-sm outline-none focus:border-[#1E93AB]"
+                            disabled={!!item.workerSignatureUrl}
+                            className="w-full min-w-[120px] rounded border border-[#DCDCDC] px-2 py-1 text-sm outline-none focus:border-[#1E93AB] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
                           />
                         </td>
                         <td className="px-2 py-2">
@@ -884,12 +893,14 @@ export default function EppDeliveriesPage() {
                           )}
                         </td>
                         <td className="px-2 py-2 text-right">
-                          <button type="button" onClick={() => removeItem(index)}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition hover:bg-red-50 hover:text-red-600"
-                            aria-label="Eliminar EPP"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          {!item.workerSignatureUrl && (
+                            <button type="button" onClick={() => removeItem(index)}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition hover:bg-red-50 hover:text-red-600"
+                              aria-label="Eliminar EPP"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}
