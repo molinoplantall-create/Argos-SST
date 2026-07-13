@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import IndustrialLayout from '@/components/layout/IndustrialLayout';
+import { Panel } from '@/components/common/Panel';
 import { SignatureDialog } from '@/components/common/SignatureDialog';
 import { supabase } from '@/lib/supabase';
 import { useFeedback } from '@/components/common/FeedbackUI';
@@ -55,11 +56,7 @@ type SignatureTarget = 'worker' | 'responsible' | null;
 const fieldClass =
   'w-full rounded-md border border-[#DCDCDC] bg-white px-3 py-2 text-sm outline-none transition focus:border-[#1E93AB] focus:ring-2 focus:ring-[#1E93AB]/20';
 
-const Panel = ({ children, className }: { children: React.ReactNode; className?: string }) => (
-  <section className={cn('rounded-lg border border-[#DCDCDC] bg-white p-5 shadow-sm', className)}>
-    {children}
-  </section>
-);
+
 
 function hasIssue(item: InspectionItem) {
   return item.condition === 'MALO' || !item.cleaningOk || !item.useOk;

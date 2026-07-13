@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import IndustrialLayout from '@/components/layout/IndustrialLayout';
+import { Panel } from '@/components/common/Panel';
 import { SignatureDialog } from '@/components/common/SignatureDialog';
 import { supabase } from '@/lib/supabase';
 import { useFeedback } from '@/components/common/FeedbackUI';
@@ -61,11 +62,7 @@ const inspectionTypes: { value: InspectionType; label: string }[] = [
 
 const initialItems: WarehouseItem[] = [];
 
-const Panel = ({ children, className }: { children: React.ReactNode; className?: string }) => (
-  <section className={cn('rounded-lg border border-[#DCDCDC] bg-white p-5 shadow-sm', className)}>
-    {children}
-  </section>
-);
+
 
 function riskDueDays(riskLevel: RiskLevel) {
   if (riskLevel === 'A') return 1;

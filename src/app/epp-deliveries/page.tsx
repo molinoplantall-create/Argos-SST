@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import IndustrialLayout from '@/components/layout/IndustrialLayout';
+import { Panel } from '@/components/common/Panel';
 import { SignatureDialog } from '@/components/common/SignatureDialog';
 import { supabase } from '@/lib/supabase';
 import { useFeedback } from '@/components/common/FeedbackUI';
@@ -113,11 +114,7 @@ function StatusBadge({ status }: { status: DeliveryStatus }) {
   );
 }
 
-const Panel = ({ children, className }: { children: React.ReactNode; className?: string }) => (
-  <section className={cn('rounded-lg border border-[#DCDCDC] bg-white p-4 shadow-sm', className)}>
-    {children}
-  </section>
-);
+
 
 const moneyFormatter = new Intl.NumberFormat('es-PE', {
   style: 'currency',
