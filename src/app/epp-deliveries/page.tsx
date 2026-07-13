@@ -656,7 +656,7 @@ export default function EppDeliveriesPage() {
 
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1.2fr_0.8fr]">
           {/* ── COLUMNA IZQUIERDA ── */}
-          <div className="space-y-3">
+          <div className="space-y-3 min-w-0">
             {/* Panel: Datos de entrega */}
             <Panel>
               <div className="mb-2 flex items-center justify-between gap-3">
@@ -1145,7 +1145,7 @@ export default function EppDeliveriesPage() {
           </div>
 
           {/* ── COLUMNA DERECHA ── */}
-          <div className="space-y-3">
+          <div className="space-y-3 min-w-0">
             {/* Panel: Resumen */}
             <Panel className="bg-[#134686] text-white">
               <div className="flex items-center justify-between">
