@@ -788,7 +788,7 @@ export default function EppDeliveriesPage() {
                 </div>
               </div>
 
-              <div className="mt-3 overflow-x-auto">
+              <div className="mt-3 hidden md:block overflow-x-auto">
                 <table className="w-full min-w-[1024px] text-left text-sm">
                   <thead>
                     <tr className="border-b border-[#DCDCDC] text-xs uppercase tracking-widest text-gray-500">
@@ -910,6 +910,119 @@ export default function EppDeliveriesPage() {
                     )}
                   </tbody>
                 </table>
+              </div>
+
+              <div className="mt-3 space-y-2 md:hidden">
+                {items.length === 0 ? (
+                  <div className="rounded-md border border-dashed border-[#DCDCDC] p-4 text-center text-sm text-gray-400">
+                    Agrega EPPs desde el catálogo para este trabajador.
+                  </div>
+                ) : (
+                  items.map((item, index) => {
+                    const catalogItem = catalog.find(c => c.id === item.id) as CatalogItem & { available_sizes?: string[] } | undefined;
+                    const availableSizes = catalogItem?.available_sizes || [];
+                    const locked = !!item.workerSignatureUrl;
+                    return (
+                      <div key={`${item.id}-${index}`} className="flex flex-col gap-3 rounded-md border border-[#DCDCDC] bg-[#F3F2EC] p-3 text-sm">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-2">
+                            <HardHat className="h-4 w-4 flex-shrink-0 text-[#1E93AB]" />
+                            <div className="min-w-0">
+                              <p className="font-bold leading-tight text-[#134686]">{item.name}</p>
+                              <p className="text-xs text-gray-500">
+                                {[item.body_zone, item.certification || 'Pendiente'].filter(Boolean).join(' · ')}
+                              </p>
+                            </div>
+                          </div>
+                          {!locked && (
+                            <button type="button" onClick={() => removeItem(index)}
+                              className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500 transition">
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <span className="block text-gray-500 mb-1">Fecha</span>
+                            <span className="font-bold">{deliveryDate}</span>
+                          </div>
+                          <div>
+                            <span className="block text-gray-500 mb-1">Precio</span>
+                            <div className="flex gap-1 items-center">
+                              <select value={item.currency ?? 'PEN'} onChange={(e) => updateItem(index, { currency: e.target.value })}
+                                disabled={locked}
+                                className="w-12 rounded border border-[#DCDCDC] px-1 py-1 outline-none focus:border-[#1E93AB] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed">
+                                <option value="PEN">S/</option>
+                                <option value="USD">$</option>
+                              </select>
+                              <input type="number" step="0.01" min="0" value={item.unit_price ?? 0}
+                                onChange={(e) => updateItem(index, { unit_price: parseFloat(e.target.value) || 0 })}
+                                disabled={locked}
+                                className="w-full rounded border border-[#DCDCDC] px-2 py-1 outline-none focus:border-[#1E93AB] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+                              />
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <span className="block text-gray-500 mb-1">Cant.</span>
+                            <input type="number" min={1} value={item.quantity}
+                              onChange={(e) => updateItem(index, { quantity: parseInt(e.target.value) || 1 })}
+                              disabled={locked}
+                              className="w-full rounded border border-[#DCDCDC] px-2 py-1 outline-none focus:border-[#1E93AB] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+                            />
+                          </div>
+                          <div>
+                            <span className="block text-gray-500 mb-1">Talla</span>
+                            {availableSizes.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {availableSizes.map((s: string) => (
+                                  <button key={s} type="button"
+                                    onClick={() => !locked && updateItem(index, { size: s })}
+                                    disabled={locked}
+                                    className={cn('rounded border px-1.5 py-0.5 text-[10px] font-bold',
+                                      locked ? 'border-[#DCDCDC] bg-gray-100 text-gray-400 cursor-not-allowed'
+                                        : item.size === s ? 'border-[#FF7F11] bg-[#FF7F11] text-white' : 'border-[#DCDCDC] bg-white text-gray-700 hover:border-[#1E93AB]'
+                                    )}>
+                                    {s}
+                                  </button>
+                                ))}
+                              </div>
+                            ) : (
+                              <input type="text" placeholder="Ej: M" value={item.size ?? ''}
+                                onChange={(e) => updateItem(index, { size: e.target.value })}
+                                disabled={locked}
+                                className="w-full rounded border border-[#DCDCDC] px-2 py-1 outline-none focus:border-[#1E93AB] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+                              />
+                            )}
+                          </div>
+                          <div className="col-span-2">
+                            <span className="block text-gray-500 mb-1">Observación</span>
+                            <input type="text" placeholder="Observación..." value={item.observation ?? ''}
+                              onChange={(e) => updateItem(index, { observation: e.target.value })}
+                              disabled={locked}
+                              className="w-full rounded border border-[#DCDCDC] px-2 py-1 outline-none focus:border-[#1E93AB] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+                            />
+                          </div>
+                        </div>
+                        
+                        <div className="mt-1 flex items-center justify-between border-t border-[#DCDCDC] pt-2">
+                          <span className="text-xs font-bold text-gray-500">Firma:</span>
+                          {item.workerSignatureUrl ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-1 text-xs font-black text-green-700">
+                              <FileSignature className="h-3 w-3" /> Firmado
+                            </span>
+                          ) : (
+                            <button type="button" onClick={() => setSignatureTarget({ type: 'worker', itemIndex: index, title: `Firma de ${selectedWorker?.full_name} por ${item.name}` })}
+                              className="inline-flex items-center gap-1 rounded-md border border-[#DCDCDC] px-2 py-1 text-xs font-black text-[#134686] transition hover:border-[#1E93AB] hover:text-[#1E93AB]">
+                              <FileSignature className="h-3 w-3" /> Firmar
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </Panel>
 
