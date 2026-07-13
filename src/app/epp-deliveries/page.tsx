@@ -866,21 +866,12 @@ export default function EppDeliveriesPage() {
                         <td className="px-2 py-2">
                           <div className="flex flex-col gap-1 items-end">
                             <div className="flex gap-1">
-                              <select value={item.currency ?? 'PEN'} onChange={(e) => updateItem(index, { currency: e.target.value })}
-                                disabled={!!item.workerSignatureUrl}
-                                className="w-12 rounded border border-[#DCDCDC] px-1 py-1 text-xs outline-none focus:border-[#1E93AB] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed">
-                                <option value="PEN">S/</option>
-                                <option value="USD">$</option>
-                              </select>
                               <input type="number" step="0.01" min="0" value={item.unit_price ?? 0}
                                 onChange={(e) => updateItem(index, { unit_price: parseFloat(e.target.value) || 0 })}
                                 disabled={!!item.workerSignatureUrl}
-                                className="w-20 rounded border border-[#DCDCDC] px-2 py-1 text-sm outline-none text-right focus:border-[#1E93AB] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+                                className="w-24 rounded border border-[#DCDCDC] px-2 py-1 text-sm outline-none text-right focus:border-[#1E93AB] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
                               />
                             </div>
-                            <span className="text-xs text-gray-500 font-bold">
-                              Sub: {item.currency === 'USD' ? '$' : 'S/'} {((item.unit_price ?? 0) * item.quantity).toFixed(2)}
-                            </span>
                           </div>
                         </td>
                         <td className="px-2 py-2">
@@ -964,16 +955,10 @@ export default function EppDeliveriesPage() {
                           <div>
                             <span className="block text-gray-500 mb-1">Precio</span>
                             <div className="flex gap-1 items-center">
-                              <select value={item.currency ?? 'PEN'} onChange={(e) => updateItem(index, { currency: e.target.value })}
-                                disabled={locked}
-                                className="w-12 rounded border border-[#DCDCDC] px-1 py-1 outline-none focus:border-[#1E93AB] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed">
-                                <option value="PEN">S/</option>
-                                <option value="USD">$</option>
-                              </select>
                               <input type="number" step="0.01" min="0" value={item.unit_price ?? 0}
                                 onChange={(e) => updateItem(index, { unit_price: parseFloat(e.target.value) || 0 })}
                                 disabled={locked}
-                                className="w-full rounded border border-[#DCDCDC] px-2 py-1 outline-none focus:border-[#1E93AB] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+                                className="w-24 rounded border border-[#DCDCDC] px-2 py-1 outline-none focus:border-[#1E93AB] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
                               />
                             </div>
                           </div>
