@@ -451,15 +451,21 @@ export default function EppDeliveriesPage() {
 
   async function saveSignature(signatureUrl: string) {
     if (signatureTarget?.type === 'worker') {
-      signItem(signatureTarget.itemIndex, signatureUrl);
-      await saveDelivery('BORRADOR', { silent: true });
+      const updatedItems = items.map((item, i) =>
+        i === signatureTarget.itemIndex
+          ? { ...item, workerSignatureUrl: signatureUrl, signedAt: new Date().toISOString() }
+          : item
+      );
+      setItems(updatedItems);
+      await saveDelivery('BORRADOR', { silent: true, itemsOverride: updatedItems });
     }
     if (signatureTarget?.type === 'responsible') setResponsibleSignatureUrl(signatureUrl);
     setSignatureTarget(null);
   }
 
-  async function saveDelivery(status: 'BORRADOR' | 'FIRMADO', options?: { silent?: boolean }) {
+  async function saveDelivery(status: 'BORRADOR' | 'FIRMADO', options?: { silent?: boolean; itemsOverride?: typeof items }) {
     if (!selectedWorker || items.length === 0) return null;
+    const itemsToSave = options?.itemsOverride ?? items;
     setSaving(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -494,7 +500,7 @@ export default function EppDeliveriesPage() {
         setEditingDeliveryId(delivery.id);
         setEditingDocumentCode(docCode);
       }
-      const deliveryItems = items.map(item => ({
+      const deliveryItems = itemsToSave.map(item => ({
         delivery_id: delivery.id,
         epp_id: item.id,
         epp_name: item.name,
@@ -513,14 +519,14 @@ export default function EppDeliveriesPage() {
       if (itemsError) throw itemsError;
 
       // Solo promover a EPP actuales los ítems que el trabajador ya firmó
-      const signedForAssignment = items.filter(item => item.workerSignatureUrl);
+      const signedForAssignment = itemsToSave.filter(item => item.workerSignatureUrl);
       if (signedForAssignment.length > 0) {
         if (editingDeliveryId) {
           await supabase.from('worker_epp_assignments').delete().eq('delivery_id', delivery.id);
         }
         const assignments = signedForAssignment.map((item) => {
           // Buscar el delivery_item_id correspondiente: mismo orden que items original
-          const originalIdx = items.indexOf(item);
+          const originalIdx = itemsToSave.indexOf(item);
           return {
             client_id: profile!.client_id,
             worker_id: selectedWorker.id,
@@ -731,302 +737,365 @@ export default function EppDeliveriesPage() {
                 </div>
               </div>
             </Panel>
+          </div>
 
-            {/* Panel: EPP Entregado */}
-            <Panel>
-              <div className="mb-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <h2 className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-[#111827]">
-                  <HardHat className="h-4 w-4 text-[#1E93AB]" />
-                  EPP entregado
-                </h2>
-                <div className="relative w-full md:w-80">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                  <input
-                    className={cn(fieldClass, 'pl-9')}
-                    placeholder="Buscar en catalogo"
-                    value={searchTerm}
-                    onChange={(e) => {
-                      const term = e.target.value;
-                      setSearchTerm(term);
-                      // Si el EPP seleccionado no está en los resultados filtrados, seleccionar el primero visible
-                      const filtered = catalog.filter((item) =>
-                        `${item.name} ${item.body_zone} ${item.certification ?? ''}`.toLowerCase().includes(term.toLowerCase())
-                      );
-                      if (filtered.length > 0 && !filtered.some(item => item.id === selectedEppId)) {
-                        setSelectedEppId(filtered[0].id);
-                      }
-                    }}
+          {/* ── COLUMNA DERECHA ── */}
+          <div className="space-y-3 min-w-0">
+            {/* Panel: Resumen */}
+            <Panel className="bg-[#134686] text-white xl:max-w-none max-w-xl mx-auto">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-widest text-[#FFB26B]">Resumen</p>
+                  <h2 className="mt-2 text-lg font-bold">{selectedWorker?.full_name || 'Sin trabajador'}</h2>
+                </div>
+                <PackageCheck className="h-8 w-8 flex-shrink-0 text-[#FF7F11]" />
+              </div>
+
+              <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-2">
+                <div className="rounded-md border border-white/10 bg-white/5 p-3">
+                  <p className="text-xs text-gray-300">Items entrega</p>
+                  <p className="mt-1 text-lg font-black xl:text-2xl">{items.length}</p>
+                </div>
+                <div className="rounded-md border border-white/10 bg-white/5 p-3">
+                  <p className="text-xs text-gray-300">Total entrega</p>
+                  <p className="mt-1 truncate text-lg font-black xl:text-2xl">S/ {totalEstimated.toFixed(2)}</p>
+                </div>
+                <div className="rounded-md border border-white/10 bg-white/5 p-3">
+                  <p className="text-xs text-gray-300">Firmas EPP</p>
+                  <p className="mt-1 text-lg font-black xl:text-2xl">{signedItems}/{items.length}</p>
+                </div>
+                <div className="rounded-md border border-white/10 bg-white/5 p-3 overflow-hidden">
+                  <p className="text-xs text-gray-300">Total activos</p>
+                  <p className="mt-1 truncate text-lg font-black xl:text-2xl">
+                    S/ {workerCurrentEpps.filter(e => e.status === 'ACTIVO').reduce((s, e) => s + (e.unit_price ?? 0), 0).toFixed(2)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-5 space-y-2 text-sm text-gray-200">
+                <div className="flex justify-between gap-2 border-t border-white/10 pt-2">
+                  <span className="shrink-0 text-gray-400">Fecha</span>
+                  <strong className="truncate">{deliveryDate}</strong>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <span className="shrink-0 text-gray-400">Responsable</span>
+                  <strong className="truncate">{deliveredBy}</strong>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <span className="shrink-0 text-gray-400">Estado</span>
+                  <StatusBadge
+                    status={getDeliveryStatus({
+                      status: editingDeliveryId ? editingStatus : 'BORRADOR',
+                      delivered_by_signature_url: responsibleSignatureUrl,
+                      epp_delivery_items: items.map((item) => ({ worker_signature_url: item.workerSignatureUrl })),
+                    })}
                   />
                 </div>
               </div>
+            </Panel>
+          </div>
+        </div>
 
-              <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1.3fr_0.35fr_0.35fr_0.55fr_0.9fr_1fr_auto]">
-                <label className="space-y-1">
-                  <span className="text-xs font-bold text-gray-500">EPP</span>
-                  <select className={fieldClass} value={selectedEppId} onChange={(e) => setSelectedEppId(e.target.value)}>
-                    {filteredCatalog.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name} - {item.body_zone}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="space-y-1">
-                  <span className="text-xs font-bold text-gray-500">Cantidad</span>
-                  <input type="number" min={1} className={fieldClass} value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} />
-                </label>
-                <label className="space-y-1">
-                  <span className="text-xs font-bold text-gray-500">Talla</span>
-                  <input className={fieldClass} value={size} onChange={(e) => setSize(e.target.value)} />
-                </label>
-                <label className="space-y-1">
-                  <span className="text-xs font-bold text-gray-500">Precio</span>
-                  <input type="number" min={0} step="0.01" className={fieldClass} value={unitPrice} onChange={(e) => setUnitPrice(Number(e.target.value))} />
-                </label>
-                <label className="space-y-1">
-                  <span className="text-xs font-bold text-gray-500">Certificacion</span>
-                  <input className={fieldClass} value={certification} onChange={(e) => setCertification(e.target.value)} placeholder="ANSI, NIOSH..." />
-                </label>
-                <label className="space-y-1">
-                  <span className="text-xs font-bold text-gray-500">Observacion</span>
-                  <input className={fieldClass} value={observation} onChange={(e) => setObservation(e.target.value)} />
-                </label>
-                <div className="flex items-end">
-                  <button
-                    type="button"
-                    onClick={addItem}
-                    disabled={!selectedEpp}
-                    className="flex h-10 w-full items-center justify-center gap-2 rounded-md bg-[#FF7F11] px-4 text-sm font-black text-white transition hover:bg-[#E62727] lg:w-auto disabled:opacity-50"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Agregar
-                  </button>
-                </div>
+        {/* Panel: EPP Entregado — ancho completo */}
+        <div className="mt-3">
+          <Panel>
+            <div className="mb-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <h2 className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-[#111827]">
+                <HardHat className="h-4 w-4 text-[#1E93AB]" />
+                EPP entregado
+              </h2>
+              <div className="relative w-full md:w-80">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  className={cn(fieldClass, 'pl-9')}
+                  placeholder="Buscar en catalogo"
+                  value={searchTerm}
+                  onChange={(e) => {
+                    const term = e.target.value;
+                    setSearchTerm(term);
+                    // Si el EPP seleccionado no está en los resultados filtrados, seleccionar el primero visible
+                    const filtered = catalog.filter((item) =>
+                      `${item.name} ${item.body_zone} ${item.certification ?? ''}`.toLowerCase().includes(term.toLowerCase())
+                    );
+                    if (filtered.length > 0 && !filtered.some(item => item.id === selectedEppId)) {
+                      setSelectedEppId(filtered[0].id);
+                    }
+                  }}
+                />
               </div>
+            </div>
 
-              <div className="mt-3 hidden xl:block overflow-x-auto">
-                <table className="w-full min-w-[1024px] text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-[#DCDCDC] text-xs uppercase tracking-widest text-gray-500">
-                      <th className="px-2 pb-3">EPP</th>
-                      <th className="px-2 pb-3">Fecha</th>
-                      <th className="px-2 pb-3">Certificacion</th>
-                      <th className="px-2 pb-3 text-center">Cant.</th>
-                      <th className="px-2 pb-3">Talla</th>
-                      <th className="px-2 pb-3 text-right">Precio</th>
-                      <th className="px-2 pb-3">Obs.</th>
-                      <th className="px-2 pb-3">Firma trabajador</th>
-                      <th className="px-2 pb-3 text-right">Accion</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#E5E7EB]">
-                    {items.map((item, index) => (
-                      <tr key={`${item.id}-${index}`} className="align-middle">
-                        <td className="px-2 py-2 font-bold text-[#134686]">{item.name}</td>
-                        <td className="px-2 py-2 text-gray-600">{deliveryDate}</td>
-                        <td className="px-2 py-2">
-                          <span className="inline-flex items-center gap-1 rounded-full bg-[#F3F4F6] px-2 py-1 text-xs font-bold text-gray-700">
-                            <BadgeCheck className="h-3 w-3 text-[#1E93AB]" />
-                            {item.certification ?? 'Pendiente'}
+            <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1.3fr_0.35fr_0.35fr_0.55fr_0.9fr_1fr_auto]">
+              <label className="space-y-1">
+                <span className="text-xs font-bold text-gray-500">EPP</span>
+                <select className={fieldClass} value={selectedEppId} onChange={(e) => setSelectedEppId(e.target.value)}>
+                  {filteredCatalog.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name} - {item.body_zone}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="space-y-1">
+                <span className="text-xs font-bold text-gray-500">Cantidad</span>
+                <input type="number" min={1} className={fieldClass} value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} />
+              </label>
+              <label className="space-y-1">
+                <span className="text-xs font-bold text-gray-500">Talla</span>
+                <input className={fieldClass} value={size} onChange={(e) => setSize(e.target.value)} />
+              </label>
+              <label className="space-y-1">
+                <span className="text-xs font-bold text-gray-500">Precio</span>
+                <input type="number" min={0} step="0.01" className={fieldClass} value={unitPrice} onChange={(e) => setUnitPrice(Number(e.target.value))} />
+              </label>
+              <label className="space-y-1">
+                <span className="text-xs font-bold text-gray-500">Certificacion</span>
+                <input className={fieldClass} value={certification} onChange={(e) => setCertification(e.target.value)} placeholder="ANSI, NIOSH..." />
+              </label>
+              <label className="space-y-1">
+                <span className="text-xs font-bold text-gray-500">Observacion</span>
+                <input className={fieldClass} value={observation} onChange={(e) => setObservation(e.target.value)} />
+              </label>
+              <div className="flex items-end">
+                <button
+                  type="button"
+                  onClick={addItem}
+                  disabled={!selectedEpp}
+                  className="flex h-10 w-full items-center justify-center gap-2 rounded-md bg-[#FF7F11] px-4 text-sm font-black text-white transition hover:bg-[#E62727] lg:w-auto disabled:opacity-50"
+                >
+                  <Plus className="h-4 w-4" />
+                  Agregar
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-3 hidden xl:block overflow-x-auto">
+              <table className="w-full min-w-[1024px] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-[#DCDCDC] text-xs uppercase tracking-widest text-gray-500">
+                    <th className="px-2 pb-3">EPP</th>
+                    <th className="px-2 pb-3">Fecha</th>
+                    <th className="px-2 pb-3">Certificacion</th>
+                    <th className="px-2 pb-3 text-center">Cant.</th>
+                    <th className="px-2 pb-3">Talla</th>
+                    <th className="px-2 pb-3 text-right">Precio</th>
+                    <th className="px-2 pb-3">Obs.</th>
+                    <th className="px-2 pb-3">Firma trabajador</th>
+                    <th className="px-2 pb-3 text-right">Accion</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#E5E7EB]">
+                  {items.map((item, index) => (
+                    <tr key={`${item.id}-${index}`} className="align-middle">
+                      <td className="px-2 py-2 font-bold text-[#134686]">{item.name}</td>
+                      <td className="px-2 py-2 text-gray-600">{deliveryDate}</td>
+                      <td className="px-2 py-2">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-[#F3F4F6] px-2 py-1 text-xs font-bold text-gray-700">
+                          <BadgeCheck className="h-3 w-3 text-[#1E93AB]" />
+                          {item.certification ?? 'Pendiente'}
+                        </span>
+                      </td>
+                      <td className="px-2 py-2 text-center">
+                        <input
+                          type="number" min={1} value={item.quantity}
+                          onChange={(e) => updateItem(index, { quantity: parseInt(e.target.value) || 1 })}
+                          disabled={!!item.workerSignatureUrl}
+                          className="w-16 rounded border border-[#DCDCDC] px-2 py-1 text-sm outline-none focus:border-[#1E93AB] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+                        />
+                      </td>
+                      <td className="px-2 py-2">
+                        {(() => {
+                          const availableSizes = (catalog.find(c => c.id === item.id) as any)?.available_sizes || [];
+                          const locked = !!item.workerSignatureUrl;
+                          return availableSizes.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {availableSizes.map((s: string) => (
+                                <button key={s} type="button"
+                                  onClick={() => !locked && updateItem(index, { size: s })}
+                                  disabled={locked}
+                                  className={cn('rounded-md border px-2 py-1 text-xs font-bold',
+                                    locked ? 'border-[#DCDCDC] bg-gray-100 text-gray-400 cursor-not-allowed'
+                                      : item.size === s ? 'border-[#FF7F11] bg-[#FF7F11] text-white' : 'border-[#DCDCDC] bg-white text-gray-700 hover:border-[#1E93AB]'
+                                  )}>
+                                  {s}
+                                </button>
+                              ))}
+                            </div>
+                          ) : (
+                            <input type="text" placeholder="Ej: M, 42" value={item.size ?? ''}
+                              onChange={(e) => updateItem(index, { size: e.target.value })}
+                              disabled={locked}
+                              className="w-20 rounded border border-[#DCDCDC] px-2 py-1 text-sm outline-none focus:border-[#1E93AB] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+                            />
+                          );
+                        })()}
+                      </td>
+                      <td className="px-2 py-2">
+                        <div className="flex flex-col gap-1 items-end">
+                          <div className="flex gap-1">
+                            <input type="number" step="0.01" min="0" value={item.unit_price ?? 0}
+                              onChange={(e) => updateItem(index, { unit_price: parseFloat(e.target.value) || 0 })}
+                              disabled={!!item.workerSignatureUrl}
+                              className="w-24 rounded border border-[#DCDCDC] px-2 py-1 text-sm outline-none text-right focus:border-[#1E93AB] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+                            />
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-2 py-2">
+                        <input type="text" value={item.observation ?? ''} onChange={(e) => updateItem(index, { observation: e.target.value })}
+                          disabled={!!item.workerSignatureUrl}
+                          className="w-full min-w-[120px] rounded border border-[#DCDCDC] px-2 py-1 text-sm outline-none focus:border-[#1E93AB] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+                        />
+                      </td>
+                      <td className="px-2 py-2">
+                        {item.workerSignatureUrl ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-1 text-xs font-black text-green-700">
+                            <FileSignature className="h-3 w-3" /> Firmado
                           </span>
-                        </td>
-                        <td className="px-2 py-2 text-center">
-                          <input
-                            type="number" min={1} value={item.quantity}
-                            onChange={(e) => updateItem(index, { quantity: parseInt(e.target.value) || 1 })}
-                            disabled={!!item.workerSignatureUrl}
-                            className="w-16 rounded border border-[#DCDCDC] px-2 py-1 text-sm outline-none focus:border-[#1E93AB] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
-                          />
-                        </td>
-                        <td className="px-2 py-2">
-                          {(() => {
-                            const availableSizes = (catalog.find(c => c.id === item.id) as any)?.available_sizes || [];
-                            const locked = !!item.workerSignatureUrl;
-                            return availableSizes.length > 0 ? (
-                              <div className="flex flex-wrap gap-1">
-                                {availableSizes.map((s: string) => (
-                                  <button key={s} type="button"
-                                    onClick={() => !locked && updateItem(index, { size: s })}
-                                    disabled={locked}
-                                    className={cn('rounded-md border px-2 py-1 text-xs font-bold',
-                                      locked ? 'border-[#DCDCDC] bg-gray-100 text-gray-400 cursor-not-allowed'
-                                        : item.size === s ? 'border-[#FF7F11] bg-[#FF7F11] text-white' : 'border-[#DCDCDC] bg-white text-gray-700 hover:border-[#1E93AB]'
-                                    )}>
-                                    {s}
-                                  </button>
-                                ))}
-                              </div>
-                            ) : (
-                              <input type="text" placeholder="Ej: M, 42" value={item.size ?? ''}
-                                onChange={(e) => updateItem(index, { size: e.target.value })}
-                                disabled={locked}
-                                className="w-20 rounded border border-[#DCDCDC] px-2 py-1 text-sm outline-none focus:border-[#1E93AB] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
-                              />
-                            );
-                          })()}
-                        </td>
-                        <td className="px-2 py-2">
-                          <div className="flex flex-col gap-1 items-end">
-                            <div className="flex gap-1">
-                              <input type="number" step="0.01" min="0" value={item.unit_price ?? 0}
-                                onChange={(e) => updateItem(index, { unit_price: parseFloat(e.target.value) || 0 })}
-                                disabled={!!item.workerSignatureUrl}
-                                className="w-24 rounded border border-[#DCDCDC] px-2 py-1 text-sm outline-none text-right focus:border-[#1E93AB] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
-                              />
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-2 py-2">
-                          <input type="text" value={item.observation ?? ''} onChange={(e) => updateItem(index, { observation: e.target.value })}
-                            disabled={!!item.workerSignatureUrl}
-                            className="w-full min-w-[120px] rounded border border-[#DCDCDC] px-2 py-1 text-sm outline-none focus:border-[#1E93AB] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
-                          />
-                        </td>
-                        <td className="px-2 py-2">
-                          {item.workerSignatureUrl ? (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-1 text-xs font-black text-green-700">
-                              <FileSignature className="h-3 w-3" /> Firmado
-                            </span>
-                          ) : (
-                            <button type="button"
-                              onClick={() => setSignatureTarget({ type: 'worker', itemIndex: index, title: `Firma de ${selectedWorker?.full_name} por ${item.name}` })}
-                              className="inline-flex items-center gap-1 rounded-md border border-[#DCDCDC] px-2 py-1 text-xs font-black text-[#134686] transition hover:border-[#1E93AB] hover:text-[#1E93AB]"
-                            >
-                              <FileSignature className="h-3 w-3" /> Firmar
-                            </button>
-                          )}
-                        </td>
-                        <td className="px-2 py-2 text-right">
-                          {!item.workerSignatureUrl && (
-                            <button type="button" onClick={() => removeItem(index)}
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition hover:bg-red-50 hover:text-red-600"
-                              aria-label="Eliminar EPP"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                    {items.length === 0 && (
-                      <tr>
-                        <td colSpan={9} className="py-8 text-center text-gray-400">
-                          Agrega EPPs desde el catálogo para este trabajador.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                        ) : (
+                          <button type="button"
+                            onClick={() => setSignatureTarget({ type: 'worker', itemIndex: index, title: `Firma de ${selectedWorker?.full_name} por ${item.name}` })}
+                            className="inline-flex items-center gap-1 rounded-md border border-[#DCDCDC] px-2 py-1 text-xs font-black text-[#134686] transition hover:border-[#1E93AB] hover:text-[#1E93AB]"
+                          >
+                            <FileSignature className="h-3 w-3" /> Firmar
+                          </button>
+                        )}
+                      </td>
+                      <td className="px-2 py-2 text-right">
+                        {!item.workerSignatureUrl && (
+                          <button type="button" onClick={() => removeItem(index)}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition hover:bg-red-50 hover:text-red-600"
+                            aria-label="Eliminar EPP"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {items.length === 0 && (
+                    <tr>
+                      <td colSpan={9} className="py-8 text-center text-gray-400">
+                        Agrega EPPs desde el catálogo para este trabajador.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
 
-              <div className="mt-3 space-y-2 xl:hidden">
-                {items.length === 0 ? (
-                  <div className="rounded-md border border-dashed border-[#DCDCDC] p-4 text-center text-sm text-gray-400">
-                    Agrega EPPs desde el catálogo para este trabajador.
-                  </div>
-                ) : (
-                  items.map((item, index) => {
-                    const catalogItem = catalog.find(c => c.id === item.id) as CatalogItem & { available_sizes?: string[] } | undefined;
-                    const availableSizes = catalogItem?.available_sizes || [];
-                    const locked = !!item.workerSignatureUrl;
-                    return (
-                      <div key={`${item.id}-${index}`} className="flex flex-col gap-3 rounded-md border border-[#DCDCDC] bg-[#F3F2EC] p-3 text-sm">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-center gap-2">
-                            <HardHat className="h-4 w-4 flex-shrink-0 text-[#1E93AB]" />
-                            <div className="min-w-0">
-                              <p className="font-bold leading-tight text-[#134686]">{item.name}</p>
-                              <p className="text-xs text-gray-500">
-                                {[item.body_zone, item.certification || 'Pendiente'].filter(Boolean).join(' · ')}
-                              </p>
-                            </div>
+            <div className="mt-3 space-y-2 xl:hidden">
+              {items.length === 0 ? (
+                <div className="rounded-md border border-dashed border-[#DCDCDC] p-4 text-center text-sm text-gray-400">
+                  Agrega EPPs desde el catálogo para este trabajador.
+                </div>
+              ) : (
+                items.map((item, index) => {
+                  const catalogItem = catalog.find(c => c.id === item.id) as CatalogItem & { available_sizes?: string[] } | undefined;
+                  const availableSizes = catalogItem?.available_sizes || [];
+                  const locked = !!item.workerSignatureUrl;
+                  return (
+                    <div key={`${item.id}-${index}`} className="flex flex-col gap-3 rounded-md border border-[#DCDCDC] bg-[#F3F2EC] p-3 text-sm">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-2">
+                          <HardHat className="h-4 w-4 flex-shrink-0 text-[#1E93AB]" />
+                          <div className="min-w-0">
+                            <p className="font-bold leading-tight text-[#134686]">{item.name}</p>
+                            <p className="text-xs text-gray-500">
+                              {[item.body_zone, item.certification || 'Pendiente'].filter(Boolean).join(' · ')}
+                            </p>
                           </div>
-                          {!locked && (
-                            <button type="button" onClick={() => removeItem(index)}
-                              className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500 transition">
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          )}
                         </div>
-                        
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                          <div>
-                            <span className="block text-gray-500 mb-1">Fecha</span>
-                            <span className="font-bold">{deliveryDate}</span>
-                          </div>
-                          <div>
-                            <span className="block text-gray-500 mb-1">Precio</span>
-                            <div className="flex gap-1 items-center">
-                              <input type="number" step="0.01" min="0" value={item.unit_price ?? 0}
-                                onChange={(e) => updateItem(index, { unit_price: parseFloat(e.target.value) || 0 })}
-                                disabled={locked}
-                                className="w-24 rounded border border-[#DCDCDC] px-2 py-1 outline-none focus:border-[#1E93AB] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
-                              />
-                            </div>
-                          </div>
-                          
-                          <div>
-                            <span className="block text-gray-500 mb-1">Cant.</span>
-                            <input type="number" min={1} value={item.quantity}
-                              onChange={(e) => updateItem(index, { quantity: parseInt(e.target.value) || 1 })}
+                        {!locked && (
+                          <button type="button" onClick={() => removeItem(index)}
+                            className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500 transition">
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <span className="block text-gray-500 mb-1">Fecha</span>
+                          <span className="font-bold">{deliveryDate}</span>
+                        </div>
+                        <div>
+                          <span className="block text-gray-500 mb-1">Precio</span>
+                          <div className="flex gap-1 items-center">
+                            <input type="number" step="0.01" min="0" value={item.unit_price ?? 0}
+                              onChange={(e) => updateItem(index, { unit_price: parseFloat(e.target.value) || 0 })}
                               disabled={locked}
-                              className="w-full rounded border border-[#DCDCDC] px-2 py-1 outline-none focus:border-[#1E93AB] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
-                            />
-                          </div>
-                          <div>
-                            <span className="block text-gray-500 mb-1">Talla</span>
-                            {availableSizes.length > 0 ? (
-                              <div className="flex flex-wrap gap-1">
-                                {availableSizes.map((s: string) => (
-                                  <button key={s} type="button"
-                                    onClick={() => !locked && updateItem(index, { size: s })}
-                                    disabled={locked}
-                                    className={cn('rounded border px-1.5 py-0.5 text-[10px] font-bold',
-                                      locked ? 'border-[#DCDCDC] bg-gray-100 text-gray-400 cursor-not-allowed'
-                                        : item.size === s ? 'border-[#FF7F11] bg-[#FF7F11] text-white' : 'border-[#DCDCDC] bg-white text-gray-700 hover:border-[#1E93AB]'
-                                    )}>
-                                    {s}
-                                  </button>
-                                ))}
-                              </div>
-                            ) : (
-                              <input type="text" placeholder="Ej: M" value={item.size ?? ''}
-                                onChange={(e) => updateItem(index, { size: e.target.value })}
-                                disabled={locked}
-                                className="w-full rounded border border-[#DCDCDC] px-2 py-1 outline-none focus:border-[#1E93AB] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
-                              />
-                            )}
-                          </div>
-                          <div className="col-span-2">
-                            <span className="block text-gray-500 mb-1">Observación</span>
-                            <input type="text" placeholder="Observación..." value={item.observation ?? ''}
-                              onChange={(e) => updateItem(index, { observation: e.target.value })}
-                              disabled={locked}
-                              className="w-full rounded border border-[#DCDCDC] px-2 py-1 outline-none focus:border-[#1E93AB] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+                              className="w-24 rounded border border-[#DCDCDC] px-2 py-1 outline-none focus:border-[#1E93AB] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
                             />
                           </div>
                         </div>
                         
-                        <div className="mt-1 flex items-center justify-between border-t border-[#DCDCDC] pt-2">
-                          <span className="text-xs font-bold text-gray-500">Firma:</span>
-                          {item.workerSignatureUrl ? (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-1 text-xs font-black text-green-700">
-                              <FileSignature className="h-3 w-3" /> Firmado
-                            </span>
+                        <div>
+                          <span className="block text-gray-500 mb-1">Cant.</span>
+                          <input type="number" min={1} value={item.quantity}
+                            onChange={(e) => updateItem(index, { quantity: parseInt(e.target.value) || 1 })}
+                            disabled={locked}
+                            className="w-full rounded border border-[#DCDCDC] px-2 py-1 outline-none focus:border-[#1E93AB] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+                          />
+                        </div>
+                        <div>
+                          <span className="block text-gray-500 mb-1">Talla</span>
+                          {availableSizes.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {availableSizes.map((s: string) => (
+                                <button key={s} type="button"
+                                  onClick={() => !locked && updateItem(index, { size: s })}
+                                  disabled={locked}
+                                  className={cn('rounded border px-1.5 py-0.5 text-[10px] font-bold',
+                                    locked ? 'border-[#DCDCDC] bg-gray-100 text-gray-400 cursor-not-allowed'
+                                      : item.size === s ? 'border-[#FF7F11] bg-[#FF7F11] text-white' : 'border-[#DCDCDC] bg-white text-gray-700 hover:border-[#1E93AB]'
+                                  )}>
+                                  {s}
+                                </button>
+                              ))}
+                            </div>
                           ) : (
-                            <button type="button" onClick={() => setSignatureTarget({ type: 'worker', itemIndex: index, title: `Firma de ${selectedWorker?.full_name} por ${item.name}` })}
-                              className="inline-flex items-center gap-1 rounded-md border border-[#DCDCDC] px-2 py-1 text-xs font-black text-[#134686] transition hover:border-[#1E93AB] hover:text-[#1E93AB]">
-                              <FileSignature className="h-3 w-3" /> Firmar
-                            </button>
+                            <input type="text" placeholder="Ej: M" value={item.size ?? ''}
+                              onChange={(e) => updateItem(index, { size: e.target.value })}
+                              disabled={locked}
+                              className="w-full rounded border border-[#DCDCDC] px-2 py-1 outline-none focus:border-[#1E93AB] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+                            />
                           )}
+                        </div>
+                        <div className="col-span-2">
+                          <span className="block text-gray-500 mb-1">Observación</span>
+                          <input type="text" placeholder="Observación..." value={item.observation ?? ''}
+                            onChange={(e) => updateItem(index, { observation: e.target.value })}
+                            disabled={locked}
+                            className="w-full rounded border border-[#DCDCDC] px-2 py-1 outline-none focus:border-[#1E93AB] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+                          />
                         </div>
                       </div>
-                    );
-                  })
-                )}
-              </div>
-            </Panel>
+                      
+                      <div className="mt-1 flex items-center justify-between border-t border-[#DCDCDC] pt-2">
+                        <span className="text-xs font-bold text-gray-500">Firma:</span>
+                        {item.workerSignatureUrl ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-1 text-xs font-black text-green-700">
+                            <FileSignature className="h-3 w-3" /> Firmado
+                          </span>
+                        ) : (
+                          <button type="button" onClick={() => setSignatureTarget({ type: 'worker', itemIndex: index, title: `Firma de ${selectedWorker?.full_name} por ${item.name}` })}
+                            className="inline-flex items-center gap-1 rounded-md border border-[#DCDCDC] px-2 py-1 text-xs font-black text-[#134686] transition hover:border-[#1E93AB] hover:text-[#1E93AB]">
+                            <FileSignature className="h-3 w-3" /> Firmar
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </Panel>
+        </div>
 
+        {/* Fila inferior: EPP actuales + Historial */}
+        <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-[1.2fr_0.8fr]">
+          <div className="space-y-3 min-w-0">
             {/* Panel: EPP actuales del trabajador */}
             {selectedWorkerId && (
               <Panel>
@@ -1136,63 +1205,9 @@ export default function EppDeliveriesPage() {
               </Panel>
             )}
           </div>
-
-          {/* ── COLUMNA DERECHA ── */}
           <div className="space-y-3 min-w-0">
-            {/* Panel: Resumen */}
-            <Panel className="bg-[#134686] text-white xl:max-w-none max-w-xl mx-auto">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-black uppercase tracking-widest text-[#FFB26B]">Resumen</p>
-                  <h2 className="mt-2 text-lg font-bold">{selectedWorker?.full_name || 'Sin trabajador'}</h2>
-                </div>
-                <PackageCheck className="h-8 w-8 flex-shrink-0 text-[#FF7F11]" />
-              </div>
-
-              <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-2">
-                <div className="rounded-md border border-white/10 bg-white/5 p-3">
-                  <p className="text-xs text-gray-300">Items entrega</p>
-                  <p className="mt-1 text-lg font-black xl:text-2xl">{items.length}</p>
-                </div>
-                <div className="rounded-md border border-white/10 bg-white/5 p-3">
-                  <p className="text-xs text-gray-300">Total entrega</p>
-                  <p className="mt-1 truncate text-lg font-black xl:text-2xl">S/ {totalEstimated.toFixed(2)}</p>
-                </div>
-                <div className="rounded-md border border-white/10 bg-white/5 p-3">
-                  <p className="text-xs text-gray-300">Firmas EPP</p>
-                  <p className="mt-1 text-lg font-black xl:text-2xl">{signedItems}/{items.length}</p>
-                </div>
-                <div className="rounded-md border border-white/10 bg-white/5 p-3 overflow-hidden">
-                  <p className="text-xs text-gray-300">Total activos</p>
-                  <p className="mt-1 truncate text-lg font-black xl:text-2xl">
-                    S/ {workerCurrentEpps.filter(e => e.status === 'ACTIVO').reduce((s, e) => s + (e.unit_price ?? 0), 0).toFixed(2)}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-5 space-y-2 text-sm text-gray-200">
-                <div className="flex justify-between gap-2 border-t border-white/10 pt-2">
-                  <span className="shrink-0 text-gray-400">Fecha</span>
-                  <strong className="truncate">{deliveryDate}</strong>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <span className="shrink-0 text-gray-400">Responsable</span>
-                  <strong className="truncate">{deliveredBy}</strong>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <span className="shrink-0 text-gray-400">Estado</span>
-                  <StatusBadge
-                    status={getDeliveryStatus({
-                      status: editingDeliveryId ? editingStatus : 'BORRADOR',
-                      delivered_by_signature_url: responsibleSignatureUrl,
-                      epp_delivery_items: items.map((item) => ({ worker_signature_url: item.workerSignatureUrl })),
-                    })}
-                  />
-                </div>
-              </div>
-            </Panel>
-
             {/* Panel: Historial de entregas */}
+
             <Panel>
               <h2 className="mb-2 text-sm font-black uppercase tracking-widest text-[#134686]">Historial de entregas</h2>
               {recentDeliveries.length === 0 ? (
