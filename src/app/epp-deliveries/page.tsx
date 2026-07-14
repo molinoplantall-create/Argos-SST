@@ -748,25 +748,25 @@ export default function EppDeliveriesPage() {
                   <p className="text-xs font-black uppercase tracking-widest text-[#FFB26B]">Resumen</p>
                   <h2 className="mt-2 text-lg font-bold">{selectedWorker?.full_name || 'Sin trabajador'}</h2>
                 </div>
-                <PackageCheck className="h-6 w-6 flex-shrink-0 text-[#FF7F11]" />
+                <PackageCheck className="h-8 w-8 flex-shrink-0 text-[#FF7F11]" />
               </div>
 
-              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-2">
-                <div className="rounded-md border border-white/10 bg-white/5 p-2">
+              <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-2">
+                <div className="rounded-md border border-white/10 bg-white/5 p-3">
                   <p className="text-xs text-gray-300">Items entrega</p>
-                  <p className="mt-1 text-base font-black xl:text-xl">{items.length}</p>
+                  <p className="mt-1 text-lg font-black xl:text-2xl">{items.length}</p>
                 </div>
-                <div className="rounded-md border border-white/10 bg-white/5 p-2">
+                <div className="rounded-md border border-white/10 bg-white/5 p-3">
                   <p className="text-xs text-gray-300">Total entrega</p>
-                  <p className="mt-1 truncate text-base font-black xl:text-xl">S/ {totalEstimated.toFixed(2)}</p>
+                  <p className="mt-1 truncate text-lg font-black xl:text-2xl">S/ {totalEstimated.toFixed(2)}</p>
                 </div>
-                <div className="rounded-md border border-white/10 bg-white/5 p-2">
+                <div className="rounded-md border border-white/10 bg-white/5 p-3">
                   <p className="text-xs text-gray-300">Firmas EPP</p>
-                  <p className="mt-1 text-base font-black xl:text-xl">{signedItems}/{items.length}</p>
+                  <p className="mt-1 text-lg font-black xl:text-2xl">{signedItems}/{items.length}</p>
                 </div>
-                <div className="rounded-md border border-white/10 bg-white/5 p-2 overflow-hidden">
+                <div className="rounded-md border border-white/10 bg-white/5 p-3 overflow-hidden">
                   <p className="text-xs text-gray-300">Total activos</p>
-                  <p className="mt-1 truncate text-base font-black xl:text-xl">
+                  <p className="mt-1 truncate text-lg font-black xl:text-2xl">
                     S/ {workerCurrentEpps.filter(e => e.status === 'ACTIVO').reduce((s, e) => s + (e.unit_price ?? 0), 0).toFixed(2)}
                   </p>
                 </div>
