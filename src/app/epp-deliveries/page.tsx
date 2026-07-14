@@ -804,7 +804,7 @@ export default function EppDeliveriesPage() {
                 </div>
               </div>
 
-              <div className="mt-3 hidden md:block overflow-x-auto">
+              <div className="mt-3 hidden xl:block overflow-x-auto">
                 <table className="w-full min-w-[1024px] text-left text-sm">
                   <thead>
                     <tr className="border-b border-[#DCDCDC] text-xs uppercase tracking-widest text-gray-500">
@@ -919,7 +919,7 @@ export default function EppDeliveriesPage() {
                 </table>
               </div>
 
-              <div className="mt-3 space-y-2 md:hidden">
+              <div className="mt-3 space-y-2 xl:hidden">
                 {items.length === 0 ? (
                   <div className="rounded-md border border-dashed border-[#DCDCDC] p-4 text-center text-sm text-gray-400">
                     Agrega EPPs desde el catálogo para este trabajador.
@@ -1140,7 +1140,7 @@ export default function EppDeliveriesPage() {
           {/* ── COLUMNA DERECHA ── */}
           <div className="space-y-3 min-w-0">
             {/* Panel: Resumen */}
-            <Panel className="bg-[#134686] text-white">
+            <Panel className="bg-[#134686] text-white xl:max-w-none max-w-xl mx-auto">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-black uppercase tracking-widest text-[#FFB26B]">Resumen</p>
@@ -1149,22 +1149,22 @@ export default function EppDeliveriesPage() {
                 <PackageCheck className="h-8 w-8 flex-shrink-0 text-[#FF7F11]" />
               </div>
 
-              <div className="mt-5 grid grid-cols-2 gap-3">
+              <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-2">
                 <div className="rounded-md border border-white/10 bg-white/5 p-3">
                   <p className="text-xs text-gray-300">Items entrega</p>
-                  <p className="mt-1 text-2xl font-black">{items.length}</p>
+                  <p className="mt-1 text-lg font-black xl:text-2xl">{items.length}</p>
                 </div>
                 <div className="rounded-md border border-white/10 bg-white/5 p-3">
                   <p className="text-xs text-gray-300">Total entrega</p>
-                  <p className="mt-1 truncate text-2xl font-black">S/ {totalEstimated.toFixed(2)}</p>
+                  <p className="mt-1 truncate text-lg font-black xl:text-2xl">S/ {totalEstimated.toFixed(2)}</p>
                 </div>
                 <div className="rounded-md border border-white/10 bg-white/5 p-3">
                   <p className="text-xs text-gray-300">Firmas EPP</p>
-                  <p className="mt-1 text-2xl font-black">{signedItems}/{items.length}</p>
+                  <p className="mt-1 text-lg font-black xl:text-2xl">{signedItems}/{items.length}</p>
                 </div>
                 <div className="rounded-md border border-white/10 bg-white/5 p-3 overflow-hidden">
                   <p className="text-xs text-gray-300">Total activos</p>
-                  <p className="mt-1 truncate text-2xl font-black">
+                  <p className="mt-1 truncate text-lg font-black xl:text-2xl">
                     S/ {workerCurrentEpps.filter(e => e.status === 'ACTIVO').reduce((s, e) => s + (e.unit_price ?? 0), 0).toFixed(2)}
                   </p>
                 </div>
