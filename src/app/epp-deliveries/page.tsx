@@ -25,7 +25,7 @@ import {
   UserRound,
   Loader2
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 import { useIsAdmin } from '@/lib/useIsAdmin';
 
 type CatalogItem = {
@@ -80,31 +80,31 @@ type RecentDelivery = {
   status: string;
   delivered_by_signature_url?: string;
   workers?: { full_name?: string } | null;
-  epp_delivery_items?: { count: number; worker_signature_url?: string }[];
+  epp_delivery_items?: { worker_signature_url?: string | null }[];
 };
 
 const fieldClass =
   'w-full rounded-md border border-[#DCDCDC] bg-white px-3 py-2 text-sm outline-none transition focus:border-[#1E93AB] focus:ring-2 focus:ring-[#1E93AB]/20';
 
-type DeliveryStatus = 'ENTREGADO' | 'PENDIENTE' | 'BAJA';
+type DeliveryStatus = 'ENTREGADO' | 'EN_PROCESO' | 'PENDIENTE' | 'BAJA';
 
 function getDeliveryStatus(delivery: {
   status: string;
-  delivered_by_signature_url?: string | null;
   epp_delivery_items?: { worker_signature_url?: string | null }[];
 }): DeliveryStatus {
   if (delivery.status === 'BAJA' || delivery.status === 'ANULADO') return 'BAJA';
   const items = delivery.epp_delivery_items ?? [];
-  const allSigned =
-    delivery.delivered_by_signature_url &&
-    items.length > 0 &&
-    items.every((i) => i.worker_signature_url);
-  return allSigned ? 'ENTREGADO' : 'PENDIENTE';
+  if (items.length === 0) return 'PENDIENTE';
+  const signedCount = items.filter((i) => i.worker_signature_url).length;
+  if (signedCount === 0) return 'PENDIENTE';
+  if (signedCount < items.length) return 'EN_PROCESO';
+  return 'ENTREGADO';
 }
 
 function StatusBadge({ status }: { status: DeliveryStatus }) {
   const styles: Record<DeliveryStatus, string> = {
     ENTREGADO: 'bg-green-100 text-green-700',
+    EN_PROCESO: 'bg-blue-100 text-blue-700',
     PENDIENTE: 'bg-amber-100 text-amber-700',
     BAJA: 'bg-gray-100 text-gray-500',
   };
@@ -164,11 +164,12 @@ export default function EppDeliveriesPage() {
   const isAdmin = useIsAdmin();
 
   async function loadRecentDeliveries() {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('epp_deliveries')
-      .select('id, document_code, delivery_date, status, delivered_by_signature_url, workers(full_name), epp_delivery_items(count, worker_signature_url)')
+      .select('id, document_code, delivery_date, status, delivered_by_signature_url, workers(full_name), epp_delivery_items(worker_signature_url)')
       .order('created_at', { ascending: false })
       .limit(8);
+    if (error) console.error('loadRecentDeliveries error:', error);
     if (data) setRecentDeliveries(data as RecentDelivery[]);
   }
 
@@ -182,7 +183,7 @@ export default function EppDeliveriesPage() {
       const [wRes, cRes, dRes] = await Promise.all([
         supabase.from('workers').select('*').eq('status', 'ACTIVO').order('full_name'),
         supabase.from('epp_catalog').select('*').eq('is_active', true).order('name'),
-        supabase.from('epp_deliveries').select('id, document_code, delivery_date, status, delivered_by_signature_url, workers(full_name), epp_delivery_items(count, worker_signature_url)').order('created_at', { ascending: false }).limit(8)
+        supabase.from('epp_deliveries').select('id, document_code, delivery_date, status, delivered_by_signature_url, workers(full_name), epp_delivery_items(worker_signature_url)').order('created_at', { ascending: false }).limit(8)
       ]);
       if (wRes.data) setWorkers(wRes.data);
       if (cRes.data) {
@@ -748,25 +749,25 @@ export default function EppDeliveriesPage() {
                   <p className="text-xs font-black uppercase tracking-widest text-[#FFB26B]">Resumen</p>
                   <h2 className="mt-2 text-lg font-bold">{selectedWorker?.full_name || 'Sin trabajador'}</h2>
                 </div>
-                <PackageCheck className="h-8 w-8 flex-shrink-0 text-[#FF7F11]" />
+                <PackageCheck className="h-6 w-6 flex-shrink-0 text-[#FF7F11]" />
               </div>
 
-              <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-2">
-                <div className="rounded-md border border-white/10 bg-white/5 p-3">
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-2">
+                <div className="rounded-md border border-white/10 bg-white/5 p-2">
                   <p className="text-xs text-gray-300">Items entrega</p>
-                  <p className="mt-1 text-lg font-black xl:text-2xl">{items.length}</p>
+                  <p className="mt-1 text-base font-black xl:text-xl">{items.length}</p>
                 </div>
-                <div className="rounded-md border border-white/10 bg-white/5 p-3">
+                <div className="rounded-md border border-white/10 bg-white/5 p-2">
                   <p className="text-xs text-gray-300">Total entrega</p>
-                  <p className="mt-1 truncate text-lg font-black xl:text-2xl">S/ {totalEstimated.toFixed(2)}</p>
+                  <p className="mt-1 truncate text-base font-black xl:text-xl">S/ {totalEstimated.toFixed(2)}</p>
                 </div>
-                <div className="rounded-md border border-white/10 bg-white/5 p-3">
+                <div className="rounded-md border border-white/10 bg-white/5 p-2">
                   <p className="text-xs text-gray-300">Firmas EPP</p>
-                  <p className="mt-1 text-lg font-black xl:text-2xl">{signedItems}/{items.length}</p>
+                  <p className="mt-1 text-base font-black xl:text-xl">{signedItems}/{items.length}</p>
                 </div>
-                <div className="rounded-md border border-white/10 bg-white/5 p-3 overflow-hidden">
+                <div className="rounded-md border border-white/10 bg-white/5 p-2 overflow-hidden">
                   <p className="text-xs text-gray-300">Total activos</p>
-                  <p className="mt-1 truncate text-lg font-black xl:text-2xl">
+                  <p className="mt-1 truncate text-base font-black xl:text-xl">
                     S/ {workerCurrentEpps.filter(e => e.status === 'ACTIVO').reduce((s, e) => s + (e.unit_price ?? 0), 0).toFixed(2)}
                   </p>
                 </div>
@@ -775,7 +776,7 @@ export default function EppDeliveriesPage() {
               <div className="mt-5 space-y-2 text-sm text-gray-200">
                 <div className="flex justify-between gap-2 border-t border-white/10 pt-2">
                   <span className="shrink-0 text-gray-400">Fecha</span>
-                  <strong className="truncate">{deliveryDate}</strong>
+                  <strong className="truncate">{formatDate(deliveryDate)}</strong>
                 </div>
                 <div className="flex justify-between gap-2">
                   <span className="shrink-0 text-gray-400">Responsable</span>
@@ -786,7 +787,6 @@ export default function EppDeliveriesPage() {
                   <StatusBadge
                     status={getDeliveryStatus({
                       status: editingDeliveryId ? editingStatus : 'BORRADOR',
-                      delivered_by_signature_url: responsibleSignatureUrl,
                       epp_delivery_items: items.map((item) => ({ worker_signature_url: item.workerSignatureUrl })),
                     })}
                   />
@@ -888,7 +888,7 @@ export default function EppDeliveriesPage() {
                   {items.map((item, index) => (
                     <tr key={`${item.id}-${index}`} className="align-middle">
                       <td className="px-2 py-2 font-bold text-[#134686]">{item.name}</td>
-                      <td className="px-2 py-2 text-gray-600">{deliveryDate}</td>
+                      <td className="px-2 py-2 text-gray-600">{formatDate(deliveryDate)}</td>
                       <td className="px-2 py-2">
                         <span className="inline-flex items-center gap-1 rounded-full bg-[#F3F4F6] px-2 py-1 text-xs font-bold text-gray-700">
                           <BadgeCheck className="h-3 w-3 text-[#1E93AB]" />
@@ -1017,7 +1017,7 @@ export default function EppDeliveriesPage() {
                       <div className="grid grid-cols-2 gap-2 text-xs">
                         <div>
                           <span className="block text-gray-500 mb-1">Fecha</span>
-                          <span className="font-bold">{deliveryDate}</span>
+                          <span className="font-bold">{formatDate(deliveryDate)}</span>
                         </div>
                         <div>
                           <span className="block text-gray-500 mb-1">Precio</span>
@@ -1094,7 +1094,7 @@ export default function EppDeliveriesPage() {
         </div>
 
         {/* Fila inferior: EPP actuales + Historial */}
-        <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-[1.2fr_0.8fr]">
+        <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-[1.6fr_0.4fr]">
           <div className="space-y-3 min-w-0">
             {/* Panel: EPP actuales del trabajador */}
             {selectedWorkerId && (
@@ -1162,7 +1162,7 @@ export default function EppDeliveriesPage() {
                               <span className="text-xs font-bold text-gray-600">
                                 Cant. {epp.quantity ?? 1}
                               </span>
-                              <span className="text-xs font-bold text-gray-600">{epp.assigned_date}</span>
+                              <span className="text-xs font-bold text-gray-600">{formatDate(epp.assigned_date)}</span>
                               {isAdmin ? (
                                 <button type="button" onClick={() => toggleAssignmentStatus(epp)}
                                   className={cn('w-fit rounded-md px-2 py-1 text-[10px] font-black transition',
@@ -1224,7 +1224,7 @@ export default function EppDeliveriesPage() {
                         <StatusBadge status={getDeliveryStatus(delivery)} />
                       </div>
                       <div className="mt-2 flex items-center justify-between gap-2 text-xs text-gray-500">
-                        <span>{delivery.delivery_date} · {delivery.epp_delivery_items?.[0]?.count ?? 0} EPP</span>
+                        <span>{formatDate(delivery.delivery_date)} · {delivery.epp_delivery_items?.length ?? 0} EPP</span>
                         <button type="button" onClick={() => loadDeliveryForEdit(delivery.id)} disabled={saving}
                           className="inline-flex items-center gap-1 rounded-md border border-[#DCDCDC] bg-white px-2 py-1 font-black text-[#134686] transition hover:border-[#1E93AB] hover:text-[#1E93AB] disabled:opacity-50"
                         >

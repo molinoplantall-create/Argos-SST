@@ -5,7 +5,7 @@ import IndustrialLayout from '@/components/layout/IndustrialLayout';
 import { supabase } from '@/lib/supabase';
 import { seedInitialData } from '@/lib/seedData';
 import { useFeedback } from '@/components/common/FeedbackUI';
-import { cn } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 import {
   Settings as SettingsIcon, Map, Users, Database,
   AlertCircle, RefreshCw, Plus, Trash2, KeyRound,
@@ -450,7 +450,7 @@ function UsersTab() {
                 </span>
                 {user.lastSignIn && (
                   <span className="text-gray-400 hidden sm:inline">
-                    Último: {new Date(user.lastSignIn).toLocaleDateString('es-PE')}
+                    Último: {formatDate(user.lastSignIn)}
                   </span>
                 )}
                 </div>
@@ -984,7 +984,7 @@ function EppCatalogTab() {
                     {item.unit}
                     {item.certification && ` · ${item.certification}`}
                     {item.unit_price != null && ` · S/ ${Number(item.unit_price).toFixed(2)}`}
-                    {item.created_at && ` · Agregado: ${new Date(item.created_at).toLocaleDateString('es-PE')}`}
+                    {item.created_at && ` · Agregado: ${formatDate(item.created_at)}`}
                   </p>
                 </div>
                 <div className="flex gap-2 shrink-0">

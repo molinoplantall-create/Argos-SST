@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import IndustrialLayout from '@/components/layout/IndustrialLayout';
 import { supabase } from '@/lib/supabase';
-import { cn } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 import {
   AlertTriangle, Clock, CheckCircle2, Search,
   Filter, X, RefreshCw, ChevronDown, User,
@@ -159,7 +159,7 @@ function FindingDrawer({
                   <span className="text-[10px] font-black uppercase">Vencimiento</span>
                 </div>
                 <p className="text-sm font-bold text-[#134686]">
-                  {new Date(finding.deadline).toLocaleDateString('es-PE')}
+                  {formatDate(finding.deadline)}
                 </p>
               </div>
             )}
@@ -440,7 +440,7 @@ export default function FindingsPage() {
                         {finding.deadline && (
                           <span className="text-xs text-gray-500 flex items-center gap-1">
                             <Calendar className="w-3 h-3" />
-                            {new Date(finding.deadline).toLocaleDateString('es-PE')}
+                            {formatDate(finding.deadline)}
                           </span>
                         )}
                       </div>
@@ -453,7 +453,7 @@ export default function FindingsPage() {
                       <span className="text-sm text-gray-500">{finding.inspection?.areas?.name ?? '—'}</span>
                       <span className="text-sm text-gray-500">
                         {finding.deadline
-                          ? new Date(finding.deadline).toLocaleDateString('es-PE')
+                          ? formatDate(finding.deadline)
                           : '—'}
                       </span>
                       <StatusBadge status={finding.status} onClick={() => setSelectedFinding(finding)} />

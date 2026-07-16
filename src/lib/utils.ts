@@ -14,10 +14,17 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat('es-PE', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
-  }).format(date);
+export function formatDate(value?: string | null | Date): string {
+  if (!value) return '—';
+  const strValue = value instanceof Date ? value.toISOString() : value;
+  // Si viene como 'YYYY-MM-DD' puro (inputs date, columnas date de Postgres),
+  // parsear los componentes directamente para evitar corrimientos de zona horaria.
+  const isoDateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(strValue.split('T')[0]);
+  if (isoDateOnly) {
+    const [, year, month, day] = isoDateOnly;
+    return `${day}/${month}/${year}`;
+  }
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return String(value);
+  return d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }

@@ -10,6 +10,8 @@ import {
   Font 
 } from '@react-pdf/renderer';
 
+import { formatDate } from '@/lib/utils';
+
 // Define styles to match the standard grid layout
 const styles = StyleSheet.create({
   page: {
@@ -141,7 +143,7 @@ const InspectionReportPDF = ({ data }: { data: any }) => (
             </View>
             <View style={styles.tableRow}>
                <Text style={styles.metaLabel}>FECHA:</Text>
-               <Text style={styles.metaValue}>{new Date().toLocaleDateString()}</Text>
+               <Text style={styles.metaValue}>{formatDate(new Date())}</Text>
             </View>
           </View>
         </View>
@@ -191,7 +193,7 @@ const InspectionReportPDF = ({ data }: { data: any }) => (
         <View style={styles.tableRow}>
           <View style={[styles.tableCell, { width: '30%', alignItems: 'flex-start' }]}>
             <Text style={{ fontWeight: 'bold' }}>AREAS INSPECCIONADAS: <Text style={{ fontWeight: 'normal' }}>{data.area_name} / {data.subarea_name}</Text></Text>
-            <Text style={{ fontWeight: 'bold', marginTop: 2 }}>FECHA: <Text style={{ fontWeight: 'normal' }}>{new Date(data.inspection_date).toLocaleDateString()}</Text></Text>
+            <Text style={{ fontWeight: 'bold', marginTop: 2 }}>FECHA: <Text style={{ fontWeight: 'normal' }}>{formatDate(data.inspection_date)}</Text></Text>
           </View>
           <View style={[styles.tableCell, { width: '70%', padding: 0 }]}>
             <View style={[styles.tableRow, { backgroundColor: '#E5E7EB' }]}>
@@ -283,7 +285,7 @@ const InspectionReportPDF = ({ data }: { data: any }) => (
                <Text>{f.corrective_actions?.[0]?.description || 'Pendiente de definir medida correctiva.'}</Text>
             </View>
             <View style={[styles.tableCell, { width: '8%' }]}><Text>{f.responsible_name || '-'}</Text></View>
-            <View style={[styles.tableCell, { width: '8%' }]}><Text>{f.deadline ? new Date(f.deadline).toLocaleDateString() : '-'}</Text></View>
+            <View style={[styles.tableCell, { width: '8%' }]}><Text>{f.deadline ? formatDate(f.deadline) : '-'}</Text></View>
             <View style={[styles.tableCell, { width: '10%' }]}></View>
             <View style={[styles.tableCell, { width: '12%' }]}></View>
           </View>
@@ -313,7 +315,7 @@ const InspectionReportPDF = ({ data }: { data: any }) => (
            <View style={[styles.signatureBox, { width: '30%', height: 20 }]}><Text></Text></View>
            <View style={[styles.signatureBox, { width: '25%' }]}><Text style={{ fontSize: 6 }}>{data.inspector_name}</Text></View>
            <View style={[styles.signatureBox, { width: '15%' }]}><Text>INSPECTOR SST</Text></View>
-           <View style={[styles.signatureBox, { width: '15%' }]}><Text>{new Date(data.inspection_date).toLocaleDateString()}</Text></View>
+           <View style={[styles.signatureBox, { width: '15%' }]}><Text>{formatDate(data.inspection_date)}</Text></View>
            <View style={[styles.signatureBox, { width: '15%' }]}>
               {data.inspector_signature && <Image src={data.inspector_signature} style={{ width: 30, height: 15 }} />}
            </View>

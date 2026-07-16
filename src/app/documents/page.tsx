@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import IndustrialLayout from '@/components/layout/IndustrialLayout';
 import { supabase } from '@/lib/supabase';
 import { FileText, Plus, Search, Filter, AlertCircle } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 
 export default function DocumentsPage() {
   const [documents, setDocuments] = useState<any[]>([]);
@@ -80,7 +80,7 @@ export default function DocumentsPage() {
                       <tr key={doc.id}>
                         <td className="py-4 font-medium">{doc.type}</td>
                         <td className="py-4">{doc.profiles?.full_name}</td>
-                        <td className="py-4">{new Date(doc.created_at).toLocaleDateString()}</td>
+                        <td className="py-4">{formatDate(doc.created_at)}</td>
                         <td className="py-4">
                           <span className="bg-blue-100 text-blue-700 text-[10px] px-2 py-1 rounded-full font-bold">
                             {doc.status}
