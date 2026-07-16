@@ -153,6 +153,8 @@ export default function EppDeliveriesPage() {
   const [editingDocumentCode, setEditingDocumentCode] = useState('');
   const [editingStatus, setEditingStatus] = useState('');
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [isGeneratingHistoryPdf, setIsGeneratingHistoryPdf] = useState(false);
+  const [includeBajaInHistory, setIncludeBajaInHistory] = useState(true);
   const [saving, setSaving] = useState(false);
   const [items, setItems] = useState<DeliveryItem[]>([]);
   const [workerCurrentEpps, setWorkerCurrentEpps] = useState<WorkerAssignment[]>([]);
@@ -615,6 +617,52 @@ export default function EppDeliveriesPage() {
       showToast(e.message, 'error');
     } finally {
       setIsGeneratingPdf(false);
+    }
+  }
+
+  async function downloadHistoryPdf() {
+    if (!selectedWorker || workerCurrentEpps.length === 0) return;
+    setIsGeneratingHistoryPdf(true);
+    try {
+      const filteredEpps = includeBajaInHistory
+        ? workerCurrentEpps
+        : workerCurrentEpps.filter((e) => e.status === 'ACTIVO');
+      if (filteredEpps.length === 0) {
+        showToast('No hay EPPs para incluir en el historial con el filtro actual.', 'error');
+        return;
+      }
+      const response = await fetch('/api/reports/epp-history', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          documentCode: 'R-MIC&M-SSO-008',
+          generatedDate: new Date().toISOString().slice(0, 10),
+          client: { legalName: 'ARGOS SST CLIENTE', ruc: '20000000000', address: 'LIMA', activity: 'MINERIA' },
+          worker: { fullName: selectedWorker.full_name, documentNumber: selectedWorker.document_number, position: selectedWorker.position, area: selectedWorker.area },
+          items: filteredEpps.map((epp) => ({
+            name: epp.epp_name, bodyZone: epp.body_zone, assignedDate: epp.assigned_date,
+            quantity: epp.quantity ?? 1, size: epp.size, brand: epp.brand,
+            unitPrice: epp.unit_price, status: epp.status === 'BAJA' ? 'BAJA' : 'ACTIVO',
+          })),
+        }),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => null);
+        throw new Error(err?.error || 'No se pudo generar el historial en PDF.');
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `historial-epp-${selectedWorker.document_number}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      showToast(e.message, 'error');
+    } finally {
+      setIsGeneratingHistoryPdf(false);
     }
   }
 
@@ -1120,6 +1168,31 @@ export default function EppDeliveriesPage() {
 
                 {showCurrentEpps && (
                   <div className="mt-3">
+                    {workerCurrentEpps.length > 0 && (
+                      <div className="mb-3 flex flex-col gap-2 rounded-md border border-[#DCDCDC] bg-gray-50 p-2 sm:flex-row sm:items-center sm:justify-between">
+                        <label className="flex items-center gap-2 text-xs font-bold text-gray-600">
+                          <input
+                            type="checkbox"
+                            checked={includeBajaInHistory}
+                            onChange={(e) => setIncludeBajaInHistory(e.target.checked)}
+                            className="h-3.5 w-3.5"
+                          />
+                          Incluir EPP dados de baja en el historial
+                        </label>
+                        <button
+                          type="button"
+                          onClick={downloadHistoryPdf}
+                          disabled={isGeneratingHistoryPdf}
+                          className={cn(
+                            'flex items-center justify-center gap-2 rounded-md px-3 py-1.5 text-xs font-bold text-white transition',
+                            isGeneratingHistoryPdf ? 'cursor-not-allowed bg-gray-400' : 'bg-[#1E93AB] hover:bg-[#167082]'
+                          )}
+                        >
+                          {isGeneratingHistoryPdf ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
+                          {isGeneratingHistoryPdf ? 'Generando...' : 'Exportar historial PDF'}
+                        </button>
+                      </div>
+                    )}
                     {loadingCurrentEpps ? (
                       <div className="flex items-center gap-2 text-sm text-gray-400">
                         <Loader2 className="h-4 w-4 animate-spin" />

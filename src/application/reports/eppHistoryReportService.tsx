@@ -9,24 +9,20 @@ import {
   renderToBuffer,
 } from '@react-pdf/renderer';
 
-export type EppDeliveryReportItem = {
+export type EppHistoryReportItem = {
   name: string;
   bodyZone?: string;
-  deliveryDate?: string;
+  assignedDate?: string;
   quantity: number;
-  unit?: string;
   size?: string;
-  certification?: string;
+  brand?: string;
   unitPrice?: number;
-  currency?: string;
-  observation?: string;
-  workerSignatureUrl?: string;
+  status: 'ACTIVO' | 'BAJA';
 };
 
-export type EppDeliveryReportData = {
+export type EppHistoryReportData = {
   documentCode?: string;
-  revision?: string;
-  deliveryDate: string;
+  generatedDate: string;
   client: {
     legalName: string;
     ruc: string;
@@ -40,20 +36,12 @@ export type EppDeliveryReportData = {
     position: string;
     area: string;
   };
-  deliveredBy: {
-    fullName: string;
-    signatureUrl?: string;
-  };
-  items: EppDeliveryReportItem[];
+  items: EppHistoryReportItem[];
 };
 
 const colors = {
-  red: '#E62727',
-  paper: '#F3F2EC',
   border: '#111111',
-  softBorder: '#DCDCDC',
   petrol: '#1E93AB',
-  orange: '#FF7F11',
   blue: '#134686',
 };
 
@@ -130,16 +118,17 @@ const styles = StyleSheet.create({
     width: '20%',
     padding: 0,
   },
-  signatureImage: {
-    width: 68,
-    height: 26,
-    objectFit: 'contain',
-  },
-  signatureText: {
-    color: colors.blue,
-    fontSize: 6,
+  statusActivo: {
+    color: '#15803d',
     fontWeight: 'bold',
-    textAlign: 'center',
+  },
+  statusBaja: {
+    color: '#b91c1c',
+    fontWeight: 'bold',
+  },
+  totalRow: {
+    fontWeight: 'bold',
+    backgroundColor: '#F3F4F6',
   },
   footerNote: {
     marginTop: 8,
@@ -148,16 +137,6 @@ const styles = StyleSheet.create({
     lineHeight: 1.3,
   },
 });
-
-function SignatureCell({ src }: { src?: string }) {
-  const isDataImage = src?.startsWith('data:image/');
-
-  return (
-    <View style={[styles.cell, { width: '12%', minHeight: 38, alignItems: 'center' }]}>
-      {isDataImage ? <Image src={src} style={styles.signatureImage} /> : <Text style={styles.signatureText}>PENDIENTE</Text>}
-    </View>
-  );
-}
 
 const moneyFormatter = new Intl.NumberFormat('es-PE', {
   style: 'currency',
@@ -168,7 +147,9 @@ function formatMoney(value?: number) {
   return moneyFormatter.format(Number(value ?? 0));
 }
 
-function EppDeliveryPDF({ data }: { data: EppDeliveryReportData }) {
+function EppHistoryPDF({ data }: { data: EppHistoryReportData }) {
+  const total = data.items.reduce((sum, item) => sum + (item.unitPrice ?? 0) * item.quantity, 0);
+
   return (
     <Document>
       <Page size="A4" orientation="landscape" style={styles.page}>
@@ -183,7 +164,7 @@ function EppDeliveryPDF({ data }: { data: EppDeliveryReportData }) {
             </View>
             <View style={[styles.cell, styles.titleBox]}>
               <Text style={styles.title}>SISTEMA DE GESTION DE SEGURIDAD Y SALUD OCUPACIONAL</Text>
-              <Text style={styles.subtitle}>REGISTRO DE ENTREGA DE ELEMENTOS Y EQUIPOS DE PROTECCION PERSONAL</Text>
+              <Text style={styles.subtitle}>HISTORIAL DE EQUIPOS DE PROTECCION PERSONAL ENTREGADOS</Text>
             </View>
             <View style={[styles.cell, styles.metaBox, styles.lastCell]}>
               <View style={styles.row}>
@@ -191,12 +172,8 @@ function EppDeliveryPDF({ data }: { data: EppDeliveryReportData }) {
                 <Text style={[styles.cell, styles.value, styles.lastCell, { width: '58%' }]}>{data.documentCode ?? 'R-MIC&M-SSO-008'}</Text>
               </View>
               <View style={styles.row}>
-                <Text style={[styles.cell, styles.label, { width: '42%' }]}>Revision</Text>
-                <Text style={[styles.cell, styles.value, styles.lastCell, { width: '58%' }]}>{data.revision ?? '02'}</Text>
-              </View>
-              <View style={styles.row}>
-                <Text style={[styles.cell, styles.label, { width: '42%', borderBottomWidth: 0 }]}>Fecha</Text>
-                <Text style={[styles.cell, styles.value, styles.lastCell, { width: '58%', borderBottomWidth: 0 }]}>{formatDate(data.deliveryDate)}</Text>
+                <Text style={[styles.cell, styles.label, { width: '42%', borderBottomWidth: 0 }]}>Generado</Text>
+                <Text style={[styles.cell, styles.value, styles.lastCell, { width: '58%', borderBottomWidth: 0 }]}>{formatDate(data.generatedDate)}</Text>
               </View>
             </View>
           </View>
@@ -246,70 +223,58 @@ function EppDeliveryPDF({ data }: { data: EppDeliveryReportData }) {
           </View>
 
           <View style={styles.row}>
-            <Text style={[styles.cell, styles.headerFill, { width: '4%' }]}>Item</Text>
-            <Text style={[styles.cell, styles.headerFill, { width: '22%' }]}>EPP entregado</Text>
-            <Text style={[styles.cell, styles.headerFill, { width: '10%' }]}>Fecha</Text>
-            <Text style={[styles.cell, styles.headerFill, { width: '8%' }]}>Cantidad</Text>
-            <Text style={[styles.cell, styles.headerFill, { width: '7%' }]}>Talla</Text>
-            <Text style={[styles.cell, styles.headerFill, { width: '10%' }]}>Certificacion</Text>
-            <Text style={[styles.cell, styles.headerFill, { width: '8%' }]}>P. Unit.</Text>
-            <Text style={[styles.cell, styles.headerFill, { width: '8%' }]}>Subtotal</Text>
-            <Text style={[styles.cell, styles.headerFill, { width: '11%' }]}>Observacion</Text>
-            <Text style={[styles.cell, styles.headerFill, styles.lastCell, { width: '12%' }]}>Firma trabajador</Text>
+            <Text style={[styles.cell, styles.headerFill, { width: '5%' }]}>Item</Text>
+            <Text style={[styles.cell, styles.headerFill, { width: '27%' }]}>EPP</Text>
+            <Text style={[styles.cell, styles.headerFill, { width: '13%' }]}>Fecha entrega</Text>
+            <Text style={[styles.cell, styles.headerFill, { width: '10%' }]}>Cantidad</Text>
+            <Text style={[styles.cell, styles.headerFill, { width: '9%' }]}>Talla</Text>
+            <Text style={[styles.cell, styles.headerFill, { width: '13%' }]}>Marca</Text>
+            <Text style={[styles.cell, styles.headerFill, { width: '11%' }]}>P. Unit.</Text>
+            <Text style={[styles.cell, styles.headerFill, styles.lastCell, { width: '12%' }]}>Estado</Text>
           </View>
 
           {data.items.map((item, index) => (
             <View style={styles.row} key={`${item.name}-${index}`} wrap={false}>
-              <Text style={[styles.cell, { width: '4%', textAlign: 'center' }]}>{index + 1}</Text>
-              <Text style={[styles.cell, { width: '22%' }]}>{item.name}</Text>
-              <Text style={[styles.cell, { width: '10%', textAlign: 'center' }]}>{formatDate(item.deliveryDate ?? data.deliveryDate)}</Text>
-              <Text style={[styles.cell, { width: '8%', textAlign: 'center' }]}>
-                {item.quantity} {item.unit ?? ''}
+              <Text style={[styles.cell, { width: '5%', textAlign: 'center' }]}>{index + 1}</Text>
+              <Text style={[styles.cell, { width: '27%' }]}>{item.name}</Text>
+              <Text style={[styles.cell, { width: '13%', textAlign: 'center' }]}>{formatDate(item.assignedDate)}</Text>
+              <Text style={[styles.cell, { width: '10%', textAlign: 'center' }]}>{item.quantity}</Text>
+              <Text style={[styles.cell, { width: '9%', textAlign: 'center' }]}>{item.size ?? '-'}</Text>
+              <Text style={[styles.cell, { width: '13%' }]}>{item.brand ?? '-'}</Text>
+              <Text style={[styles.cell, { width: '11%', textAlign: 'right' }]}>{formatMoney(item.unitPrice)}</Text>
+              <Text
+                style={[
+                  styles.cell,
+                  styles.lastCell,
+                  { width: '12%', textAlign: 'center' },
+                  item.status === 'ACTIVO' ? styles.statusActivo : styles.statusBaja,
+                ]}
+              >
+                {item.status}
               </Text>
-              <Text style={[styles.cell, { width: '7%', textAlign: 'center' }]}>{item.size ?? '-'}</Text>
-              <Text style={[styles.cell, { width: '10%' }]}>{item.certification ?? '-'}</Text>
-              <Text style={[styles.cell, { width: '8%', textAlign: 'right' }]}>{formatMoney(item.unitPrice)}</Text>
-              <Text style={[styles.cell, { width: '8%', textAlign: 'right' }]}>{formatMoney((item.unitPrice ?? 0) * item.quantity)}</Text>
-              <Text style={[styles.cell, { width: '11%' }]}>{item.observation ?? '-'}</Text>
-              <SignatureCell src={item.workerSignatureUrl} />
             </View>
           ))}
-        </View>
 
-        <View style={[styles.table, { marginTop: 8 }]}>
-          <View style={styles.row}>
-            <Text style={[styles.cell, styles.band, { width: '100%', borderRightWidth: 0 }]}>FIRMAS DEL REGISTRO</Text>
-          </View>
-          <View style={styles.row}>
-            <View style={[styles.cell, { width: '50%' }]}>
-              <Text style={styles.label}>Nombre y apellidos</Text>
-              <Text style={styles.value}>{data.deliveredBy.fullName}</Text>
-            </View>
-            <View style={[styles.cell, styles.lastCell, { width: '50%', minHeight: 42, alignItems: 'center' }]}>
-              <Text style={styles.label}>Firma responsable de entrega</Text>
-              {data.deliveredBy.signatureUrl?.startsWith('data:image/') ? (
-                <Image src={data.deliveredBy.signatureUrl} style={styles.signatureImage} />
-              ) : (
-                <Text style={styles.signatureText}>FIRMA PENDIENTE</Text>
-              )}
-            </View>
+          <View style={[styles.row, styles.totalRow]} wrap={false}>
+            <Text style={[styles.cell, { width: '75%', textAlign: 'right' }]}>TOTAL GENERAL (activos + baja)</Text>
+            <Text style={[styles.cell, styles.lastCell, { width: '25%', textAlign: 'right' }]}>{formatMoney(total)}</Text>
           </View>
         </View>
 
         <Text style={styles.footerNote}>
-          Declaro haber recibido los equipos de proteccion personal indicados, haber sido informado sobre su uso,
-          conservacion y reposicion, y me comprometo a utilizarlos durante la ejecucion de mis labores.
+          Este reporte incluye todos los equipos de proteccion personal entregados al trabajador,
+          independientemente de su estado actual (activo o dado de baja), para fines de auditoria y control.
         </Text>
       </Page>
     </Document>
   );
 }
 
-export class EppDeliveryReportService {
-  async generatePdf(data: EppDeliveryReportData): Promise<Buffer> {
-    const buffer = await renderToBuffer(<EppDeliveryPDF data={data} />);
+export class EppHistoryReportService {
+  async generatePdf(data: EppHistoryReportData): Promise<Buffer> {
+    const buffer = await renderToBuffer(<EppHistoryPDF data={data} />);
     return Buffer.from(buffer);
   }
 }
 
-export const eppDeliveryReportService = new EppDeliveryReportService();
+export const eppHistoryReportService = new EppHistoryReportService();

@@ -22,7 +22,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { cn } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 
 const currentMonthIndex = 5; // Junio 2026
 const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio'].slice(0, currentMonthIndex + 1);
@@ -267,7 +267,7 @@ export default function SSTDashboard() {
                   <tr key={`${item.module}-${item.detail}`}>
                     <td className="py-3 font-black text-[#134686]">{item.module}</td>
                     <td className="py-3">{item.detail}</td>
-                    <td className="py-3">{item.date}</td>
+                    <td className="py-3">{formatDate(item.date)}</td>
                     <td className="py-3">
                       <span
                         className={cn(
