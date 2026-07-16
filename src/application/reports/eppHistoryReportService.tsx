@@ -16,6 +16,7 @@ export type EppHistoryReportItem = {
   quantity: number;
   size?: string;
   brand?: string;
+  certification?: string;
   unitPrice?: number;
   status: 'ACTIVO' | 'BAJA';
   workerSignatureUrl?: string;
@@ -163,11 +164,27 @@ function formatMoney(value?: number) {
   return moneyFormatter.format(Number(value ?? 0));
 }
 
+// Anchos de columna compartidos por el header, las filas y la fila de total,
+// para que el total quede exactamente debajo de "P. Unit." y los bordes
+// de todas las celdas (incluida la firma) queden alineados y uniformes.
+const COL = {
+  item: 3,
+  epp: 18,
+  fecha: 9,
+  cantidad: 6,
+  talla: 6,
+  marca: 9,
+  certificacion: 10,
+  precio: 8,
+  estado: 8,
+  firma: 23,
+};
+
 function SignatureCell({ src }: { src?: string }) {
   const isDataImage = src?.startsWith('data:image/');
 
   return (
-    <View style={[styles.cell, styles.lastCell, { width: '10%', minHeight: 30, alignItems: 'center' }]}>
+    <View style={[styles.cell, styles.lastCell, { width: `${COL.firma}%`, alignItems: 'center', justifyContent: 'center' }]}>
       {isDataImage ? <Image src={src} style={styles.signatureImage} /> : <Text style={styles.signatureText}>PENDIENTE</Text>}
     </View>
   );
@@ -249,30 +266,32 @@ function EppHistoryPDF({ data }: { data: EppHistoryReportData }) {
           </View>
 
           <View style={styles.row}>
-            <Text style={[styles.cell, styles.headerFill, { width: '4%' }]}>Item</Text>
-            <Text style={[styles.cell, styles.headerFill, { width: '22%' }]}>EPP</Text>
-            <Text style={[styles.cell, styles.headerFill, { width: '11%' }]}>Fecha entrega</Text>
-            <Text style={[styles.cell, styles.headerFill, { width: '8%' }]}>Cantidad</Text>
-            <Text style={[styles.cell, styles.headerFill, { width: '8%' }]}>Talla</Text>
-            <Text style={[styles.cell, styles.headerFill, { width: '11%' }]}>Marca</Text>
-            <Text style={[styles.cell, styles.headerFill, { width: '9%' }]}>P. Unit.</Text>
-            <Text style={[styles.cell, styles.headerFill, { width: '9%' }]}>Estado</Text>
-            <Text style={[styles.cell, styles.headerFill, styles.lastCell, { width: '18%' }]}>Firma trabajador</Text>
+            <Text style={[styles.cell, styles.headerFill, { width: `${COL.item}%` }]}>Item</Text>
+            <Text style={[styles.cell, styles.headerFill, { width: `${COL.epp}%` }]}>EPP</Text>
+            <Text style={[styles.cell, styles.headerFill, { width: `${COL.fecha}%` }]}>Fecha entrega</Text>
+            <Text style={[styles.cell, styles.headerFill, { width: `${COL.cantidad}%` }]}>Cantidad</Text>
+            <Text style={[styles.cell, styles.headerFill, { width: `${COL.talla}%` }]}>Talla</Text>
+            <Text style={[styles.cell, styles.headerFill, { width: `${COL.marca}%` }]}>Marca</Text>
+            <Text style={[styles.cell, styles.headerFill, { width: `${COL.certificacion}%` }]}>Certificacion</Text>
+            <Text style={[styles.cell, styles.headerFill, { width: `${COL.precio}%` }]}>P. Unit.</Text>
+            <Text style={[styles.cell, styles.headerFill, { width: `${COL.estado}%` }]}>Estado</Text>
+            <Text style={[styles.cell, styles.headerFill, styles.lastCell, { width: `${COL.firma}%` }]}>Firma trabajador</Text>
           </View>
 
           {data.items.map((item, index) => (
             <View style={styles.row} key={`${item.name}-${index}`} wrap={false}>
-              <Text style={[styles.cell, { width: '4%', textAlign: 'center' }]}>{index + 1}</Text>
-              <Text style={[styles.cell, { width: '22%' }]}>{item.name}</Text>
-              <Text style={[styles.cell, { width: '11%', textAlign: 'center' }]}>{formatDate(item.assignedDate)}</Text>
-              <Text style={[styles.cell, { width: '8%', textAlign: 'center' }]}>{item.quantity}</Text>
-              <Text style={[styles.cell, { width: '8%', textAlign: 'center' }]}>{item.size ?? '-'}</Text>
-              <Text style={[styles.cell, { width: '11%' }]}>{item.brand ?? '-'}</Text>
-              <Text style={[styles.cell, { width: '9%', textAlign: 'right' }]}>{formatMoney(item.unitPrice)}</Text>
+              <Text style={[styles.cell, { width: `${COL.item}%`, textAlign: 'center' }]}>{index + 1}</Text>
+              <Text style={[styles.cell, { width: `${COL.epp}%` }]}>{item.name}</Text>
+              <Text style={[styles.cell, { width: `${COL.fecha}%`, textAlign: 'center' }]}>{formatDate(item.assignedDate)}</Text>
+              <Text style={[styles.cell, { width: `${COL.cantidad}%`, textAlign: 'center' }]}>{item.quantity}</Text>
+              <Text style={[styles.cell, { width: `${COL.talla}%`, textAlign: 'center' }]}>{item.size ?? '-'}</Text>
+              <Text style={[styles.cell, { width: `${COL.marca}%` }]}>{item.brand ?? '-'}</Text>
+              <Text style={[styles.cell, { width: `${COL.certificacion}%` }]}>{item.certification ?? '-'}</Text>
+              <Text style={[styles.cell, { width: `${COL.precio}%`, textAlign: 'right' }]}>{formatMoney(item.unitPrice)}</Text>
               <Text
                 style={[
                   styles.cell,
-                  { width: '9%', textAlign: 'center' },
+                  { width: `${COL.estado}%`, textAlign: 'center' },
                   item.status === 'ACTIVO' ? styles.statusActivo : styles.statusBaja,
                 ]}
               >
@@ -283,8 +302,12 @@ function EppHistoryPDF({ data }: { data: EppHistoryReportData }) {
           ))}
 
           <View style={[styles.row, styles.totalRow]} wrap={false}>
-            <Text style={[styles.cell, { width: '82%', textAlign: 'right' }]}>TOTAL GENERAL (activos + baja)</Text>
-            <Text style={[styles.cell, styles.lastCell, { width: '18%', textAlign: 'right' }]}>{formatMoney(total)}</Text>
+            <Text style={[styles.cell, { width: `${COL.item + COL.epp + COL.fecha + COL.cantidad + COL.talla + COL.marca + COL.certificacion}%`, textAlign: 'right' }]}>
+              TOTAL GENERAL (activos + baja)
+            </Text>
+            <Text style={[styles.cell, { width: `${COL.precio}%`, textAlign: 'right' }]}>{formatMoney(total)}</Text>
+            <Text style={[styles.cell, { width: `${COL.estado}%` }]}></Text>
+            <Text style={[styles.cell, styles.lastCell, { width: `${COL.firma}%` }]}></Text>
           </View>
         </View>
 

@@ -166,10 +166,15 @@ export default function EppDeliveriesPage() {
 
   const isAdmin = useIsAdmin();
 
-  async function loadRecentDeliveries() {
+  async function loadRecentDeliveries(workerId?: string) {
+    if (!workerId) {
+      setRecentDeliveries([]);
+      return;
+    }
     const { data, error } = await supabase
       .from('epp_deliveries')
       .select('id, document_code, delivery_date, status, delivered_by_signature_url, workers(full_name), epp_delivery_items(epp_name, worker_signature_url)')
+      .eq('worker_id', workerId)
       .order('created_at', { ascending: false })
       .limit(8);
     if (error) console.error('loadRecentDeliveries error:', error);
@@ -183,17 +188,15 @@ export default function EppDeliveriesPage() {
         const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).single();
         if (profile) setDeliveredBy(profile.full_name);
       }
-      const [wRes, cRes, dRes] = await Promise.all([
+      const [wRes, cRes] = await Promise.all([
         supabase.from('workers').select('*').eq('status', 'ACTIVO').order('full_name'),
         supabase.from('epp_catalog').select('*').eq('is_active', true).order('name'),
-        supabase.from('epp_deliveries').select('id, document_code, delivery_date, status, delivered_by_signature_url, workers(full_name), epp_delivery_items(epp_name, worker_signature_url)').order('created_at', { ascending: false }).limit(8)
       ]);
       if (wRes.data) setWorkers(wRes.data);
       if (cRes.data) {
         setCatalog(cRes.data);
         if (cRes.data.length > 0) setSelectedEppId(cRes.data[0].id);
       }
-      if (dRes.data) setRecentDeliveries(dRes.data as RecentDelivery[]);
     }
     loadData();
   }, []);
@@ -301,7 +304,7 @@ export default function EppDeliveriesPage() {
     setWorkerCurrentEpps([]);
     setShowCurrentEpps(true);
     setShowAllCurrentEpps(false);
-    await loadWorkerCurrentEpps(worker.id);
+    await Promise.all([loadWorkerCurrentEpps(worker.id), loadRecentDeliveries(worker.id)]);
   }
 
   async function toggleAssignmentStatus(assignment: WorkerAssignment) {
@@ -563,7 +566,7 @@ export default function EppDeliveriesPage() {
       } else {
         showToast(editingDeliveryId ? `Entrega actualizada como ${status}` : `Entrega guardada como ${status}`, 'success');
       }
-      await loadRecentDeliveries();
+      await loadRecentDeliveries(selectedWorker.id);
       await loadWorkerCurrentEpps(selectedWorker.id);
       if (!options?.silent) {
         setItems([]);
@@ -646,6 +649,7 @@ export default function EppDeliveriesPage() {
           items: filteredEpps.map((epp) => ({
             name: epp.epp_name, bodyZone: epp.body_zone, assignedDate: epp.assigned_date,
             quantity: epp.quantity ?? 1, size: epp.size, brand: epp.brand,
+            certification: epp.certification,
             unitPrice: epp.unit_price, status: epp.status === 'BAJA' ? 'BAJA' : 'ACTIVO',
             workerSignatureUrl: epp.worker_signature_url,
           })),
@@ -1285,11 +1289,11 @@ export default function EppDeliveriesPage() {
           </div>
           <div className="space-y-3 min-w-0">
             {/* Panel: Historial de entregas */}
-
+            {selectedWorkerId && (
             <Panel>
               <h2 className="mb-2 text-sm font-black uppercase tracking-widest text-[#134686]">Historial de entregas</h2>
               {recentDeliveries.length === 0 ? (
-                <p className="text-sm text-gray-500">No hay entregas registradas aún.</p>
+                <p className="text-sm text-gray-500">Este trabajador no tiene entregas registradas aún.</p>
               ) : (
                 <div className="max-h-[280px] space-y-2 overflow-y-auto pr-1">
                   {recentDeliveries.map((delivery) => {
@@ -1326,6 +1330,7 @@ export default function EppDeliveriesPage() {
                 </div>
               )}
             </Panel>
+            )}
           </div>
         </div>
       </div>
