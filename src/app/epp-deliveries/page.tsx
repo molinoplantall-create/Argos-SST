@@ -63,6 +63,7 @@ type WorkerAssignment = {
   currency?: string;
   observation?: string;
   delivery_item_id?: string;
+  worker_signature_url?: string;
 };
 
 type DeliveryItem = CatalogItem & {
@@ -80,7 +81,7 @@ type RecentDelivery = {
   status: string;
   delivered_by_signature_url?: string;
   workers?: { full_name?: string } | null;
-  epp_delivery_items?: { worker_signature_url?: string | null }[];
+  epp_delivery_items?: { epp_name?: string; worker_signature_url?: string | null }[];
 };
 
 const fieldClass =
@@ -168,7 +169,7 @@ export default function EppDeliveriesPage() {
   async function loadRecentDeliveries() {
     const { data, error } = await supabase
       .from('epp_deliveries')
-      .select('id, document_code, delivery_date, status, delivered_by_signature_url, workers(full_name), epp_delivery_items(worker_signature_url)')
+      .select('id, document_code, delivery_date, status, delivered_by_signature_url, workers(full_name), epp_delivery_items(epp_name, worker_signature_url)')
       .order('created_at', { ascending: false })
       .limit(8);
     if (error) console.error('loadRecentDeliveries error:', error);
@@ -185,7 +186,7 @@ export default function EppDeliveriesPage() {
       const [wRes, cRes, dRes] = await Promise.all([
         supabase.from('workers').select('*').eq('status', 'ACTIVO').order('full_name'),
         supabase.from('epp_catalog').select('*').eq('is_active', true).order('name'),
-        supabase.from('epp_deliveries').select('id, document_code, delivery_date, status, delivered_by_signature_url, workers(full_name), epp_delivery_items(worker_signature_url)').order('created_at', { ascending: false }).limit(8)
+        supabase.from('epp_deliveries').select('id, document_code, delivery_date, status, delivered_by_signature_url, workers(full_name), epp_delivery_items(epp_name, worker_signature_url)').order('created_at', { ascending: false }).limit(8)
       ]);
       if (wRes.data) setWorkers(wRes.data);
       if (cRes.data) {
@@ -221,7 +222,7 @@ export default function EppDeliveriesPage() {
     try {
       const { data: assignmentRows, error: assignmentError } = await supabase
         .from('worker_epp_assignments')
-        .select('id, epp_id, epp_name, body_zone, size, brand, certification, quantity, assigned_date, status, current_condition, delivery_item_id, epp_delivery_items(unit_price, currency, brand)')
+        .select('id, epp_id, epp_name, body_zone, size, brand, certification, quantity, assigned_date, status, current_condition, delivery_item_id, epp_delivery_items(unit_price, currency, brand, worker_signature_url)')
         .eq('worker_id', workerId)
         .order('assigned_date', { ascending: false });
 
@@ -235,7 +236,7 @@ export default function EppDeliveriesPage() {
       if (rows.length === 0) {
         const { data: legacy } = await supabase
           .from('epp_delivery_items')
-          .select('id, epp_id, epp_name, body_zone, size, brand, certification, quantity, unit_price, currency, epp_deliveries!inner(worker_id, delivery_date, status, delivered_by_id)')
+          .select('id, epp_id, epp_name, body_zone, size, brand, certification, quantity, unit_price, currency, worker_signature_url, epp_deliveries!inner(worker_id, delivery_date, status, delivered_by_id)')
           .eq('epp_deliveries.worker_id', workerId)
           .order('epp_deliveries.delivery_date', { ascending: false });
 
@@ -255,7 +256,8 @@ export default function EppDeliveriesPage() {
             status: 'ACTIVO',
             current_condition: 'BUENO',
             delivery_item_id: a.id,
-            epp_delivery_items: [] as { unit_price: any; currency: any; brand: any }[],
+            worker_signature_url: a.worker_signature_url ?? null,
+            epp_delivery_items: [] as { unit_price: any; currency: any; brand: any; worker_signature_url: any }[],
           }));
         }
       }
@@ -271,6 +273,7 @@ export default function EppDeliveriesPage() {
           ...assignment,
           unit_price: deliveredPrice > 0 ? deliveredPrice : (assignment.unit_price > 0 ? assignment.unit_price : catalogPrice),
           currency: deliveredItem?.currency ?? catalogItem?.currency ?? assignment.currency ?? 'PEN',
+          worker_signature_url: deliveredItem?.worker_signature_url ?? assignment.worker_signature_url ?? null,
         };
       }).sort((a: any, b: any) => {
         if (a.status === 'ACTIVO' && b.status !== 'ACTIVO') return -1;
@@ -639,10 +642,12 @@ export default function EppDeliveriesPage() {
           generatedDate: new Date().toISOString().slice(0, 10),
           client: { legalName: 'ARGOS SST CLIENTE', ruc: '20000000000', address: 'LIMA', activity: 'MINERIA' },
           worker: { fullName: selectedWorker.full_name, documentNumber: selectedWorker.document_number, position: selectedWorker.position, area: selectedWorker.area },
+          deliveredBy: { fullName: deliveredBy, signatureUrl: responsibleSignatureUrl },
           items: filteredEpps.map((epp) => ({
             name: epp.epp_name, bodyZone: epp.body_zone, assignedDate: epp.assigned_date,
             quantity: epp.quantity ?? 1, size: epp.size, brand: epp.brand,
             unitPrice: epp.unit_price, status: epp.status === 'BAJA' ? 'BAJA' : 'ACTIVO',
+            workerSignatureUrl: epp.worker_signature_url,
           })),
         }),
       });
@@ -711,7 +716,7 @@ export default function EppDeliveriesPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1.2fr_0.8fr]">
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1fr_auto]">
           {/* ── COLUMNA IZQUIERDA ── */}
           <div className="space-y-3 min-w-0">
             {/* Panel: Datos de entrega */}
@@ -789,9 +794,9 @@ export default function EppDeliveriesPage() {
           </div>
 
           {/* ── COLUMNA DERECHA ── */}
-          <div className="space-y-3 min-w-0">
+          <div className="space-y-3 min-w-0 xl:w-80">
             {/* Panel: Resumen */}
-            <Panel className="bg-[#134686] text-white xl:max-w-none max-w-xl mx-auto">
+            <Panel className="bg-[#134686] text-white">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-black uppercase tracking-widest text-[#FFB26B]">Resumen</p>
@@ -1287,26 +1292,37 @@ export default function EppDeliveriesPage() {
                 <p className="text-sm text-gray-500">No hay entregas registradas aún.</p>
               ) : (
                 <div className="max-h-[280px] space-y-2 overflow-y-auto pr-1">
-                  {recentDeliveries.map((delivery) => (
+                  {recentDeliveries.map((delivery) => {
+                    const deliveryStatus = getDeliveryStatus(delivery);
+                    const itemNames = (delivery.epp_delivery_items ?? []).map((i) => i.epp_name).filter(Boolean) as string[];
+                    const displayName = itemNames.length === 0
+                      ? 'Sin EPP'
+                      : itemNames.length === 1
+                        ? itemNames[0]
+                        : `${itemNames[0]} +${itemNames.length - 1} más`;
+                    return (
                     <div key={delivery.id} className="rounded-md border border-[#E5E7EB] p-2">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="text-xs font-black text-[#1E93AB]">{delivery.document_code || 'SIN COD'}</p>
+                          <p className="truncate text-xs font-black text-[#1E93AB]">{displayName}</p>
                           <p className="mt-0.5 truncate text-sm font-bold text-[#134686]">{delivery.workers?.full_name}</p>
                         </div>
-                        <StatusBadge status={getDeliveryStatus(delivery)} />
+                        <StatusBadge status={deliveryStatus} />
                       </div>
                       <div className="mt-2 flex items-center justify-between gap-2 text-xs text-gray-500">
                         <span>{formatDate(delivery.delivery_date)} · {delivery.epp_delivery_items?.length ?? 0} EPP</span>
-                        <button type="button" onClick={() => loadDeliveryForEdit(delivery.id)} disabled={saving}
-                          className="inline-flex items-center gap-1 rounded-md border border-[#DCDCDC] bg-white px-2 py-1 font-black text-[#134686] transition hover:border-[#1E93AB] hover:text-[#1E93AB] disabled:opacity-50"
-                        >
-                          <Pencil className="h-3 w-3" />
-                          Modificar
-                        </button>
+                        {deliveryStatus === 'PENDIENTE' && (
+                          <button type="button" onClick={() => loadDeliveryForEdit(delivery.id)} disabled={saving}
+                            className="inline-flex items-center gap-1 rounded-md border border-[#DCDCDC] bg-white px-2 py-1 font-black text-[#134686] transition hover:border-[#1E93AB] hover:text-[#1E93AB] disabled:opacity-50"
+                          >
+                            <Pencil className="h-3 w-3" />
+                            Modificar
+                          </button>
+                        )}
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </Panel>
