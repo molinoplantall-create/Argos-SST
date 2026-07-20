@@ -154,6 +154,9 @@ export default function EppDeliveriesPage() {
   const [editingDocumentCode, setEditingDocumentCode] = useState('');
   const [editingStatus, setEditingStatus] = useState('');
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [companyInfo, setCompanyInfo] = useState({
+    legalName: 'EMPRESA SIN CONFIGURAR', ruc: '-', address: '-', activity: '-', logoUrl: undefined as string | undefined,
+  });
   const [isGeneratingHistoryPdf, setIsGeneratingHistoryPdf] = useState(false);
   const [includeBajaInHistory, setIncludeBajaInHistory] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -185,8 +188,22 @@ export default function EppDeliveriesPage() {
     async function loadData() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).single();
-        if (profile) setDeliveredBy(profile.full_name);
+        const { data: profile } = await supabase.from('profiles').select('full_name, client_id').eq('id', user.id).single();
+        if (profile) {
+          setDeliveredBy(profile.full_name);
+          if (profile.client_id) {
+            const { data: client } = await supabase.from('clients').select('*').eq('id', profile.client_id).single();
+            if (client) {
+              setCompanyInfo({
+                legalName: client.legal_name ?? 'EMPRESA SIN CONFIGURAR',
+                ruc: client.ruc ?? '-',
+                address: client.address ?? '-',
+                activity: client.economic_activity ?? '-',
+                logoUrl: client.logo_url ?? undefined,
+              });
+            }
+          }
+        }
       }
       const [wRes, cRes] = await Promise.all([
         supabase.from('workers').select('*').eq('status', 'ACTIVO').order('full_name'),
@@ -332,7 +349,7 @@ export default function EppDeliveriesPage() {
     if (!isAdmin) return;
     showConfirm({
       title: 'Eliminar EPP asignado',
-      message: `¿Confirmas eliminar definitivamente "${assignment.epp_name}" de los EPP actuales del trabajador?`,
+      message: `¿Confirmas eliminar DEFINITIVAMENTE "${assignment.epp_name}" de los EPP del trabajador? Esta acción no se puede deshacer y borra el registro del historial de auditoría. Si el EPP ya no está en uso, usa "Dar de baja" en vez de eliminar.`,
       onConfirm: async () => {
         try {
           setLoadingCurrentEpps(true);
@@ -595,7 +612,7 @@ export default function EppDeliveriesPage() {
           documentCode: 'R-MIC&M-SSO-008',
           revision: '02',
           deliveryDate,
-          client: { legalName: 'ARGOS SST CLIENTE', ruc: '20000000000', address: 'LIMA', activity: 'MINERIA' },
+          client: companyInfo,
           worker: { fullName: selectedWorker.full_name, documentNumber: selectedWorker.document_number, position: selectedWorker.position, area: selectedWorker.area },
           deliveredBy: { fullName: deliveredBy, signatureUrl: responsibleSignatureUrl },
           items: items.map((item) => ({
@@ -643,7 +660,7 @@ export default function EppDeliveriesPage() {
         body: JSON.stringify({
           documentCode: 'R-MIC&M-SSO-008',
           generatedDate: new Date().toISOString().slice(0, 10),
-          client: { legalName: 'ARGOS SST CLIENTE', ruc: '20000000000', address: 'LIMA', activity: 'MINERIA' },
+          client: companyInfo,
           worker: { fullName: selectedWorker.full_name, documentNumber: selectedWorker.document_number, position: selectedWorker.position, area: selectedWorker.area },
           deliveredBy: { fullName: deliveredBy, signatureUrl: responsibleSignatureUrl },
           items: filteredEpps.map((epp) => ({
@@ -1226,7 +1243,7 @@ export default function EppDeliveriesPage() {
                               </div>
                             )}
                             <div className={cn(
-                              'grid grid-cols-1 gap-3 rounded-md border px-3 py-2 text-sm md:grid-cols-[1fr_auto_auto_auto_auto_auto_auto]',
+                              'grid grid-cols-1 gap-3 rounded-md border px-3 py-2 text-sm md:grid-cols-[1fr_auto_auto_auto_auto_auto_auto_auto_auto]',
                               epp.status === 'ACTIVO' ? 'border-[#DCDCDC] bg-[#F3F2EC]' : 'border-red-200 bg-red-50'
                             )}>
                               <div className="flex min-w-0 items-center gap-2">
@@ -1271,6 +1288,20 @@ export default function EppDeliveriesPage() {
                                 {epp.current_condition || 'BUENO'}
                               </span>
                               <span className="text-right text-xs font-black text-[#134686]">{formatMoney(epp.unit_price)}</span>
+                              {!epp.worker_signature_url && (
+                                <span className="w-fit rounded-full bg-amber-100 px-2 py-1 text-[10px] font-black text-amber-700"
+                                  title="Este EPP no tiene firma del trabajador registrada">
+                                  SIN FIRMA
+                                </span>
+                              )}
+                              {isAdmin && (
+                                <button type="button" onClick={() => confirmDeleteAssignment(epp)}
+                                  className="w-fit rounded-md p-1 text-gray-400 transition hover:bg-red-50 hover:text-red-600"
+                                  title="Eliminar definitivamente (solo admin, no se puede deshacer)"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              )}
                             </div>
                           </React.Fragment>
                         ))}

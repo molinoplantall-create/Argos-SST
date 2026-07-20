@@ -860,13 +860,26 @@ function EppCatalogTab() {
   const handleDelete = (id: string, name: string) => {
     showConfirm({
       title: 'Eliminar EPP',
-      message: `¿Seguro que deseas eliminar ${name}?`,
+      message: `¿Seguro que deseas eliminar ${name}? Si este EPP ya fue entregado a algún trabajador, no se podrá eliminar (para no romper el historial) — en ese caso, márcalo como Inactivo en su lugar.`,
       onConfirm: async () => {
         const { error } = await supabase.from('epp_catalog').delete().eq('id', id);
-        if (error) showToast('Error al eliminar.', 'error');
+        if (error) {
+          if (error.code === '23503') {
+            showToast(`No se puede eliminar "${name}": ya fue entregado a uno o más trabajadores. Márcalo como Inactivo para dejar de usarlo sin perder el historial.`, 'error');
+          } else {
+            showToast('Error al eliminar.', 'error');
+          }
+        }
         else { showToast('EPP eliminado.', 'success'); loadCatalog(); }
       }
     });
+  };
+
+  const toggleActive = async (item: any) => {
+    const newValue = !item.is_active;
+    const { error } = await supabase.from('epp_catalog').update({ is_active: newValue }).eq('id', item.id);
+    if (error) showToast('Error al actualizar.', 'error');
+    else { showToast(newValue ? 'EPP activado.' : 'EPP desactivado.', 'success'); loadCatalog(); }
   };
 
   return (
@@ -973,12 +986,16 @@ function EppCatalogTab() {
                 </div>
               </div>
             ) : (
-              <div key={item.id} className="flex items-center justify-between bg-white border border-[#DCDCDC] rounded-xl px-4 py-3 hover:border-[#1E93AB]/40 transition-colors">
+              <div key={item.id} className={cn(
+                  "flex items-center justify-between bg-white border rounded-xl px-4 py-3 hover:border-[#1E93AB]/40 transition-colors",
+                  item.is_active === false ? 'border-[#DCDCDC] opacity-60' : 'border-[#DCDCDC]'
+                )}>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="font-black text-[#1a1a1a] text-sm">{item.name}</p>
                     <span className="rounded-full bg-[#1E93AB]/10 px-2 py-0.5 text-[10px] font-black text-[#1E93AB]">{item.body_zone}</span>
                     {item.brand && <span className="rounded-full bg-[#F3F2EC] px-2 py-0.5 text-[10px] font-bold text-gray-600">{item.brand}</span>}
+                    {item.is_active === false && <span className="rounded-full bg-gray-200 px-2 py-0.5 text-[10px] font-black text-gray-600">INACTIVO</span>}
                   </div>
                   <p className="text-xs text-gray-500 mt-0.5">
                     {item.unit}
@@ -988,10 +1005,15 @@ function EppCatalogTab() {
                   </p>
                 </div>
                 <div className="flex gap-2 shrink-0">
+                  <button onClick={() => toggleActive(item)}
+                    className={cn('p-2 rounded-lg transition-colors', item.is_active === false ? 'text-gray-400 hover:text-green-600 hover:bg-green-50' : 'text-gray-400 hover:text-amber-600 hover:bg-amber-50')}
+                    title={item.is_active === false ? 'Activar' : 'Desactivar (dejar de mostrarlo en nuevas entregas, sin borrar historial)'}>
+                    {item.is_active === false ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                  </button>
                   <button onClick={() => setEditingItem({...item})} className="p-2 text-[#1E93AB] hover:bg-[#1E93AB]/10 rounded-lg transition-colors" title="Editar">
                     <Pencil className="w-4 h-4" />
                   </button>
-                  <button onClick={() => handleDelete(item.id, item.name)} className="p-2 text-gray-400 hover:text-red-500 rounded-lg transition-colors" title="Eliminar">
+                  <button onClick={() => handleDelete(item.id, item.name)} className="p-2 text-gray-400 hover:text-red-500 rounded-lg transition-colors" title="Eliminar definitivamente">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
@@ -1004,10 +1026,135 @@ function EppCatalogTab() {
   );
 }
 
+// ─── DATOS DE LA EMPRESA ────────────────────────────────────────────────────
+function CompanyTab() {
+  const { showToast } = useFeedback();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [clientId, setClientId] = useState<string | null>(null);
+  const [form, setForm] = useState({
+    legal_name: '', trade_name: '', ruc: '', address: '',
+    economic_activity: '', logo_url: '',
+  });
+
+  const loadCompany = useCallback(async () => {
+    setLoading(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setLoading(false); return; }
+    const { data: profile } = await supabase.from('profiles').select('client_id').eq('id', user.id).single();
+    if (!profile?.client_id) { setLoading(false); return; }
+    setClientId(profile.client_id);
+    const { data: client } = await supabase.from('clients').select('*').eq('id', profile.client_id).single();
+    if (client) {
+      setForm({
+        legal_name: client.legal_name ?? '',
+        trade_name: client.trade_name ?? '',
+        ruc: client.ruc ?? '',
+        address: client.address ?? '',
+        economic_activity: client.economic_activity ?? '',
+        logo_url: client.logo_url ?? '',
+      });
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { loadCompany(); }, [loadCompany]);
+
+  async function handleSave() {
+    if (!clientId) return;
+    if (!form.legal_name.trim()) { showToast('La razón social es obligatoria.', 'error'); return; }
+    setSaving(true);
+    const { error } = await supabase.from('clients').update({
+      legal_name: form.legal_name.trim(),
+      trade_name: form.trade_name.trim() || null,
+      ruc: form.ruc.trim() || null,
+      address: form.address.trim() || null,
+      economic_activity: form.economic_activity.trim() || null,
+      logo_url: form.logo_url.trim() || null,
+      updated_at: new Date().toISOString(),
+    }).eq('id', clientId);
+    setSaving(false);
+    if (error) { showToast('Error al guardar los datos de la empresa.', 'error'); return; }
+    showToast('Datos de la empresa actualizados.', 'success');
+  }
+
+  if (loading) {
+    return (
+      <div className="card-industrial flex items-center justify-center py-16">
+        <Loader2 className="h-6 w-6 animate-spin text-[#1E93AB]" />
+      </div>
+    );
+  }
+
+  if (!clientId) {
+    return (
+      <div className="card-industrial text-center py-16 space-y-3 text-gray-400">
+        <Building2 className="w-12 h-12 mx-auto opacity-30" />
+        <p className="font-bold">Tu usuario no tiene una empresa asignada</p>
+        <p className="text-sm">Contacta a un superadministrador para vincular tu cuenta a una empresa (client_id).</p>
+      </div>
+    );
+  }
+
+  const fieldClass = "w-full rounded-lg border border-[#DCDCDC] px-3 py-2 text-sm focus:border-[#1E93AB] focus:outline-none focus:ring-1 focus:ring-[#1E93AB]";
+
+  return (
+    <div className="card-industrial space-y-4 p-5">
+      <div className="flex items-center gap-2 border-b border-[#DCDCDC] pb-3">
+        <Building2 className="h-5 w-5 text-[#1E93AB]" />
+        <div>
+          <p className="text-sm font-black text-[#1a1a1a]">Datos de la empresa</p>
+          <p className="text-xs text-gray-500">Esta información aparece en el encabezado de los reportes en PDF (entregas de EPP, inspecciones, historiales).</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div>
+          <label className="mb-1 block text-xs font-bold text-gray-500">Razón social *</label>
+          <input className={fieldClass} value={form.legal_name} onChange={(e) => setForm({ ...form, legal_name: e.target.value })} />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-bold text-gray-500">Nombre comercial</label>
+          <input className={fieldClass} value={form.trade_name} onChange={(e) => setForm({ ...form, trade_name: e.target.value })} />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-bold text-gray-500">RUC</label>
+          <input className={fieldClass} value={form.ruc} onChange={(e) => setForm({ ...form, ruc: e.target.value })} />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-bold text-gray-500">Actividad económica</label>
+          <input className={fieldClass} value={form.economic_activity} onChange={(e) => setForm({ ...form, economic_activity: e.target.value })} />
+        </div>
+        <div className="md:col-span-2">
+          <label className="mb-1 block text-xs font-bold text-gray-500">Domicilio / Dirección</label>
+          <input className={fieldClass} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+        </div>
+        <div className="md:col-span-2">
+          <label className="mb-1 block text-xs font-bold text-gray-500">URL del logo</label>
+          <input className={fieldClass} placeholder="https://..." value={form.logo_url} onChange={(e) => setForm({ ...form, logo_url: e.target.value })} />
+          <p className="mt-1 text-xs text-gray-400">Pega el enlace público a la imagen de tu logo (por ejemplo, subida a Supabase Storage o cualquier hosting de imágenes).</p>
+          {form.logo_url && (
+            <img src={form.logo_url} alt="Logo" className="mt-2 h-12 w-auto object-contain" onError={(e) => (e.currentTarget.style.display = 'none')} />
+          )}
+        </div>
+      </div>
+
+      <div className="flex justify-end border-t border-[#DCDCDC] pt-3">
+        <button onClick={handleSave} disabled={saving}
+          className="flex items-center gap-2 rounded-lg bg-[#134686] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#1E93AB] disabled:opacity-50">
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          Guardar datos de la empresa
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── PÁGINA PRINCIPAL ────────────────────────────────────────────────────────
-type TabId = 'areas' | 'users' | 'workers' | 'epp_catalog' | 'system';
+type TabId = 'company' | 'areas' | 'users' | 'workers' | 'epp_catalog' | 'system';
 
 const TABS: { id: TabId; label: string; icon: any }[] = [
+  { id: 'company', label: 'Empresa',           icon: Building2 },
   { id: 'areas',  label: 'Áreas de Planta', icon: Map },
   { id: 'users',  label: 'Usuarios',         icon: Users },
   { id: 'workers', label: 'Trabajadores',    icon: UserRound },
@@ -1016,7 +1163,7 @@ const TABS: { id: TabId; label: string; icon: any }[] = [
 ];
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<TabId>('users');
+  const [activeTab, setActiveTab] = useState<TabId>('company');
 
   return (
     <IndustrialLayout>
@@ -1047,6 +1194,7 @@ export default function SettingsPage() {
 
         {/* Contenido de la tab activa */}
         <div>
+          {activeTab === 'company' && <CompanyTab />}
           {activeTab === 'areas'  && <AreasTab />}
           {activeTab === 'users'  && <UsersTab />}
           {activeTab === 'workers'  && <WorkersTab />}
